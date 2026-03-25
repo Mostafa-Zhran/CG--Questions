@@ -1,0 +1,2401 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frame Buffer Calculations — Computer Graphics</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #030810;
+            --bg2: #060f1e;
+            --panel: #0a1628;
+            --border: #0d3a6e;
+            --glow: #00d4ff;
+            --glow2: #00ff9d;
+            --glow3: #ff6b35;
+            --accent: #0099cc;
+            --text: #c8e8ff;
+            --muted: #4a7a9b;
+            --highlight: #ffdd57;
+            --formula: #ff6b35;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Rajdhani', sans-serif;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* ─── STARFIELD ─── */
+        #stars {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            border-radius: 50%;
+            background: #fff;
+            animation: twinkle var(--d) ease-in-out infinite;
+            opacity: 0;
+        }
+
+        @keyframes twinkle {
+
+            0%,
+            100% {
+                opacity: 0;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: var(--o);
+                transform: scale(1.5);
+            }
+        }
+
+        /* ─── PIXEL GRID BG ─── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background-image:
+                linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+        }
+
+        /* ─── HERO ─── */
+        .hero {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 60px 20px 40px;
+        }
+
+        .hero-badge {
+            display: inline-block;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 11px;
+            color: var(--glow2);
+            border: 1px solid var(--glow2);
+            padding: 4px 14px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            animation: fadeSlide .8s ease both;
+        }
+
+        .hero h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(28px, 5vw, 62px);
+            font-weight: 900;
+            line-height: 1.1;
+            background: linear-gradient(135deg, var(--glow) 0%, var(--glow2) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: fadeSlide .8s .15s ease both;
+            text-shadow: none;
+            filter: drop-shadow(0 0 30px rgba(0, 212, 255, 0.4));
+        }
+
+        .hero-sub {
+            margin-top: 14px;
+            font-size: 16px;
+            color: var(--muted);
+            letter-spacing: 1px;
+            animation: fadeSlide .8s .3s ease both;
+        }
+
+        .formula-strip {
+            margin: 30px auto;
+            max-width: 680px;
+            background: linear-gradient(135deg, rgba(255, 107, 53, 0.1), rgba(255, 107, 53, 0.05));
+            border: 1px solid rgba(255, 107, 53, 0.4);
+            border-radius: 8px;
+            padding: 14px 24px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 13px;
+            color: var(--formula);
+            animation: fadeSlide .8s .45s ease both;
+            text-align: left;
+        }
+
+        .formula-strip span.label {
+            color: var(--highlight);
+            font-weight: bold;
+        }
+
+        /* ─── LAYOUT ─── */
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 20px 80px;
+        }
+
+        /* ─── QUESTION CARD ─── */
+        .q-card {
+            position: relative;
+            margin-bottom: 40px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity .7s ease, transform .7s ease;
+        }
+
+        .q-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .q-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--glow), var(--glow2), transparent);
+            animation: scanline 3s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% {
+                background-position: -200% 0;
+            }
+
+            100% {
+                background-position: 200% 0;
+            }
+        }
+
+        .q-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 20px 28px;
+            background: rgba(0, 212, 255, 0.04);
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+            transition: background .3s;
+        }
+
+        .q-header:hover {
+            background: rgba(0, 212, 255, 0.08);
+        }
+
+        .q-num {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--bg);
+            background: var(--glow);
+            padding: 4px 10px;
+            border-radius: 4px;
+            letter-spacing: 1px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .q-header h2 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text);
+            line-height: 1.4;
+            flex: 1;
+        }
+
+        .q-toggle {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            color: var(--glow);
+            font-size: 14px;
+            transition: transform .3s, border-color .3s;
+            flex-shrink: 0;
+        }
+
+        .q-card.open .q-toggle {
+            transform: rotate(45deg);
+            border-color: var(--glow);
+        }
+
+        /* ─── SOLUTION BODY ─── */
+        .q-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height .6s cubic-bezier(.4, 0, .2, 1);
+        }
+
+        .q-card.open .q-body {
+            max-height: 1200px;
+        }
+
+        .q-inner {
+            padding: 28px;
+        }
+
+        /* ─── PIXEL VIZ ─── */
+        .viz-area {
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--bg2);
+        }
+
+        .viz-label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 10px;
+            color: var(--muted);
+            padding: 6px 12px;
+            border-bottom: 1px solid var(--border);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        canvas.pixel-canvas {
+            display: block;
+            width: 100%;
+            height: 80px;
+            image-rendering: pixelated;
+        }
+
+        /* ─── STEP-BY-STEP ─── */
+        .steps {
+            list-style: none;
+        }
+
+        .step {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            opacity: 0;
+            transform: translateX(-20px);
+            transition: opacity .5s ease, transform .5s ease;
+        }
+
+        .step.appear {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .step-bullet {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid var(--glow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 11px;
+            color: var(--glow);
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-label {
+            font-size: 12px;
+            color: var(--muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .step-eq {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 14px;
+            color: var(--text);
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 3px solid var(--glow);
+            padding: 8px 14px;
+            border-radius: 0 6px 6px 0;
+            line-height: 1.6;
+        }
+
+        .step-eq .op {
+            color: var(--glow2);
+        }
+
+        .step-eq .num {
+            color: var(--highlight);
+        }
+
+        .step-eq .result {
+            color: var(--formula);
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .step-eq .dim {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        /* ─── ANSWER BOX ─── */
+        .answer-box {
+            margin-top: 20px;
+            background: linear-gradient(135deg, rgba(0, 255, 157, 0.06), rgba(0, 212, 255, 0.06));
+            border: 1px solid var(--glow2);
+            border-radius: 8px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            opacity: 0;
+            transform: scale(.97);
+            transition: opacity .5s .3s ease, transform .5s .3s ease;
+        }
+
+        .answer-box.appear {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .answer-icon {
+            font-size: 24px;
+        }
+
+        .answer-text {
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .answer-text .ans-label {
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .answer-text .ans-val {
+            font-size: 22px;
+            color: var(--glow2);
+            font-weight: bold;
+        }
+
+        /* ─── FORMULA BOX ─── */
+        .formula-box {
+            margin-top: 16px;
+            background: rgba(255, 107, 53, 0.07);
+            border: 1px dashed rgba(255, 107, 53, 0.5);
+            border-radius: 6px;
+            padding: 12px 16px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 12px;
+            color: var(--formula);
+            line-height: 1.7;
+        }
+
+        .formula-box strong {
+            color: var(--highlight);
+        }
+
+        /* ─── PIXEL GRID VIZ ─── */
+        .pixel-grid-wrap {
+            position: relative;
+            margin-bottom: 20px;
+            height: 64px;
+            overflow: hidden;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .pixel-row {
+            display: flex;
+            height: 100%;
+        }
+
+        .pixel-cell {
+            flex: 1;
+            min-width: 4px;
+            animation: pixelPop var(--d2) var(--delay) cubic-bezier(.36, 1.5, .6, 1) both;
+        }
+
+        @keyframes pixelPop {
+            from {
+                opacity: 0;
+                transform: scaleY(0);
+            }
+
+            to {
+                opacity: 1;
+                transform: scaleY(1);
+            }
+        }
+
+        /* ─── BIT COUNTER ─── */
+        .bit-counter {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 28px;
+            color: var(--glow);
+            text-align: center;
+            padding: 10px;
+            text-shadow: 0 0 20px var(--glow);
+            animation: countGlow 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes countGlow {
+            from {
+                text-shadow: 0 0 10px var(--glow);
+            }
+
+            to {
+                text-shadow: 0 0 30px var(--glow), 0 0 60px rgba(0, 212, 255, 0.3);
+            }
+        }
+
+        /* ─── PROGRESS BAR ─── */
+        .calc-bar-wrap {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+
+        .calc-bar {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--glow), var(--glow2));
+            width: 0%;
+            transition: width 1.5s cubic-bezier(.4, 0, .2, 1);
+            box-shadow: 0 0 10px var(--glow);
+        }
+
+        /* ─── ANIMATIONS ─── */
+        @keyframes fadeSlide {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ─── DIVIDER ─── */
+        .section-divider {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            margin: 0 0 40px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 11px;
+            color: var(--muted);
+            letter-spacing: 4px;
+        }
+
+        .section-divider::before,
+        .section-divider::after {
+            content: '';
+            display: inline-block;
+            width: 80px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border));
+            vertical-align: middle;
+            margin: 0 12px;
+        }
+
+        .section-divider::after {
+            background: linear-gradient(90deg, var(--border), transparent);
+        }
+
+        /* ─── RESPONSIVE ─── */
+        @media (max-width: 600px) {
+            .q-header h2 {
+                font-size: 13px;
+            }
+
+            .step-eq {
+                font-size: 12px;
+            }
+        }
+
+        /* ══════════════════════════════════════════
+       LAWS SECTION
+  ══════════════════════════════════════════ */
+        .laws-section {
+            position: relative;
+            z-index: 1;
+            max-width: 1100px;
+            margin: 0 auto 80px;
+            padding: 0 20px;
+        }
+
+        .laws-hero {
+            text-align: center;
+            padding: 20px 0 36px;
+        }
+
+        .laws-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(22px, 4vw, 44px);
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--highlight) 0%, var(--formula) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 0 20px rgba(255, 221, 87, 0.3));
+        }
+
+        .laws-sub {
+            margin-top: 10px;
+            font-size: 14px;
+            color: var(--muted);
+            letter-spacing: 1px;
+        }
+
+        /* GRID */
+        .laws-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 14px;
+            margin-bottom: 28px;
+        }
+
+        .law-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 18px 14px;
+            cursor: pointer;
+            transition: border-color .25s, transform .25s, background .25s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .law-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 0%, rgba(255, 221, 87, 0.06), transparent 70%);
+            opacity: 0;
+            transition: opacity .3s;
+        }
+
+        .law-card:hover {
+            border-color: var(--highlight);
+            transform: translateY(-3px);
+        }
+
+        .law-card:hover::before {
+            opacity: 1;
+        }
+
+        .law-card.active {
+            border-color: var(--highlight);
+            background: rgba(255, 221, 87, 0.06);
+            box-shadow: 0 0 20px rgba(255, 221, 87, 0.15);
+        }
+
+        .law-num {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 10px;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .law-icon {
+            font-size: 20px;
+            margin-bottom: 8px;
+            line-height: 1;
+        }
+
+        .law-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 6px;
+            line-height: 1.3;
+        }
+
+        .law-formula {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 10px;
+            color: var(--formula);
+            line-height: 1.5;
+        }
+
+        /* CALCULATOR PANEL */
+        .calc-panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            display: none;
+            animation: panelSlide .4s cubic-bezier(.4, 0, .2, 1) both;
+        }
+
+        .calc-panel.show {
+            display: block;
+        }
+
+        @keyframes panelSlide {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .calc-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            background: rgba(255, 221, 87, 0.06);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .calc-law-label {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            color: var(--highlight);
+            letter-spacing: 1px;
+        }
+
+        .calc-close {
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 16px;
+            transition: color .2s;
+            padding: 2px 6px;
+        }
+
+        .calc-close:hover {
+            color: var(--glow);
+        }
+
+        .law-detail {
+            padding: 18px 20px 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .law-detail-formula {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 15px;
+            color: var(--highlight);
+            margin-bottom: 8px;
+            line-height: 1.7;
+        }
+
+        .law-detail-desc {
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .calc-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            padding: 18px 20px 4px;
+        }
+
+        .inp-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .inp-group label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .inp-group input,
+        .inp-group select {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 9px 12px;
+            color: var(--text);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 14px;
+            transition: border-color .2s;
+            outline: none;
+        }
+
+        .inp-group input:focus,
+        .inp-group select:focus {
+            border-color: var(--glow);
+            box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.1);
+        }
+
+        .inp-group select option {
+            background: var(--bg2);
+        }
+
+        .calc-btn {
+            display: block;
+            margin: 16px 20px;
+            padding: 12px 28px;
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(0, 255, 157, 0.1));
+            border: 1px solid var(--glow);
+            border-radius: 6px;
+            color: var(--glow);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: background .25s, box-shadow .25s, transform .15s;
+        }
+
+        .calc-btn:hover {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.3), rgba(0, 255, 157, 0.2));
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .calc-btn:active {
+            transform: translateY(0);
+        }
+
+        .calc-result {
+            margin: 0 20px 20px;
+            border: 1px solid var(--glow2);
+            border-radius: 8px;
+            padding: 16px 18px;
+            background: rgba(0, 255, 157, 0.04);
+            animation: fadeSlide .4s ease both;
+        }
+
+        .calc-result-label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 9px;
+            color: var(--muted);
+            letter-spacing: 3px;
+            margin-bottom: 6px;
+        }
+
+        .calc-result-val {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 22px;
+            color: var(--glow2);
+            font-weight: 700;
+            margin-bottom: 10px;
+            word-break: break-word;
+        }
+
+        .calc-result-steps {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 11px;
+            color: var(--text);
+            line-height: 2;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+            padding-top: 10px;
+            white-space: pre-wrap;
+        }
+
+        .calc-result-steps .s-op {
+            color: var(--glow);
+        }
+
+        .calc-result-steps .s-res {
+            color: var(--highlight);
+        }
+
+        .law-canvas {
+            display: block;
+            width: calc(100% - 40px);
+            margin: 0 20px 20px;
+            height: 60px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        /* flicker meter */
+        .flicker-meter {
+            margin: 12px 20px;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 36px;
+            position: relative;
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            display: none;
+        }
+
+        .flicker-fill {
+            height: 100%;
+            transition: width 1s ease;
+            border-radius: 0;
+        }
+
+        .flicker-label {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 12px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 1px 4px #000;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="stars"></div>
+
+    <!-- HERO -->
+    <div class="hero">
+        <div class="hero-badge">◈ Computer Graphics ◈ Memory Systems</div>
+        <h1>Frame Buffer<br>Calculations</h1>
+        <p class="hero-sub">Interactive step-by-step solutions with visual representation</p>
+        <div class="formula-strip">
+            <span class="label">∑ MASTER FORMULA:</span><br>
+            Frame Buffer Size = <strong>Total Pixels × Bits per Pixel</strong><br>
+            where Total Pixels = Width × Height &nbsp;|&nbsp; Single pixel intensities = 2<sup>n</sup> &nbsp;(n =
+            bits/pixel)
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="section-divider">NUMERICAL PROBLEMS</div>
+
+        <!-- ── Q1 ── -->
+        <div class="q-card" id="q1">
+            <div class="q-header" onclick="toggle('q1')">
+                <span class="q-num">Q.N. 01</span>
+                <h2>System with 24 bits/pixel, resolution 1024×1024 — Calculate frame buffer size in Megabytes</h2>
+                <div class="q-toggle">+</div>
+            </div>
+            <div class="q-body">
+                <div class="q-inner">
+                    <div class="viz-area">
+                        <div class="viz-label">▪ Pixel Depth Visualizer — 24 bits per pixel (RGB: 8+8+8)</div>
+                        <canvas class="pixel-canvas" id="canvas1" height="80"></canvas>
+                    </div>
+                    <ul class="steps">
+                        <li class="step">
+                            <div class="step-bullet">1</div>
+                            <div class="step-content">
+                                <div class="step-label">Frame size in bits</div>
+                                <div class="step-eq"><span class="num">24</span> <span class="op">×</span> <span
+                                        class="num">1024</span> <span class="op">×</span> <span class="num">1024</span>
+                                    <span class="op">=</span> <span class="result">25,165,824 bits</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">2</div>
+                            <div class="step-content">
+                                <div class="step-label">Convert bits → bytes <span class="dim">(÷ 8)</span></div>
+                                <div class="step-eq"><span class="num">25,165,824</span> <span class="op">÷</span> <span
+                                        class="num">8</span> <span class="op">=</span> <span class="result">3,145,728
+                                        bytes</span></div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">3</div>
+                            <div class="step-content">
+                                <div class="step-label">Convert bytes → kilobytes <span class="dim">(÷ 1024)</span>
+                                </div>
+                                <div class="step-eq"><span class="num">3,145,728</span> <span class="op">÷</span> <span
+                                        class="num">1024</span> <span class="op">=</span> <span class="result">3,072
+                                        KB</span></div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">4</div>
+                            <div class="step-content">
+                                <div class="step-label">Convert KB → Megabytes <span class="dim">(÷ 1024)</span></div>
+                                <div class="step-eq"><span class="num">3,072</span> <span class="op">÷</span> <span
+                                        class="num">1024</span> <span class="op">=</span> <span class="result">3
+                                        MB</span></div>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="calc-bar-wrap">
+                        <div class="calc-bar" id="bar1"></div>
+                    </div>
+                    <div class="answer-box" id="ans1">
+                        <div class="answer-icon">✦</div>
+                        <div class="answer-text">
+                            <div class="ans-label">Frame Buffer Size</div>
+                            <div class="ans-val">3 MB</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Q2 ── -->
+        <div class="q-card" id="q2">
+            <div class="q-header" onclick="toggle('q2')">
+                <span class="q-num">Q.N. 02</span>
+                <h2>1024 intensity levels, resolution 1024×800 — Find frame buffer size in bits</h2>
+                <div class="q-toggle">+</div>
+            </div>
+            <div class="q-body">
+                <div class="q-inner">
+                    <div class="viz-area">
+                        <div class="viz-label">▪ Intensity Levels: 2ⁿ = 1024 → n = 10 bits</div>
+                        <canvas class="pixel-canvas" id="canvas2" height="80"></canvas>
+                    </div>
+                    <ul class="steps">
+                        <li class="step">
+                            <div class="step-bullet">1</div>
+                            <div class="step-content">
+                                <div class="step-label">Solve for n bits/pixel</div>
+                                <div class="step-eq"><span class="num">2</span><sup>n</sup> <span class="op">=</span>
+                                    <span class="num">1024</span> &nbsp;→&nbsp; n <span class="op">=</span> <span
+                                        class="result">10 bits</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">2</div>
+                            <div class="step-content">
+                                <div class="step-label">Frame buffer size</div>
+                                <div class="step-eq"><span class="num">10</span> <span class="op">×</span> <span
+                                        class="num">1024</span> <span class="op">×</span> <span class="num">800</span>
+                                    <span class="op">=</span> <span class="result">8,192,000 bits</span>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="calc-bar-wrap">
+                        <div class="calc-bar" id="bar2"></div>
+                    </div>
+                    <div class="answer-box" id="ans2">
+                        <div class="answer-icon">✦</div>
+                        <div class="answer-text">
+                            <div class="ans-label">Frame Buffer Size</div>
+                            <div class="ans-val">8,192,000 bits</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Q3 ── -->
+        <div class="q-card" id="q3">
+            <div class="q-header" onclick="toggle('q3')">
+                <span class="q-num">Q.N. 03</span>
+                <h2>Resolution 600×400, n bits/pixel — Frame buffer size expression</h2>
+                <div class="q-toggle">+</div>
+            </div>
+            <div class="q-body">
+                <div class="q-inner">
+                    <div class="viz-area">
+                        <div class="viz-label">▪ Symbolic Frame Size — resolution 600×400</div>
+                        <canvas class="pixel-canvas" id="canvas3" height="80"></canvas>
+                    </div>
+                    <ul class="steps">
+                        <li class="step">
+                            <div class="step-bullet">1</div>
+                            <div class="step-content">
+                                <div class="step-label">Frame size in bits</div>
+                                <div class="step-eq">(<span class="num">600</span> <span class="op">×</span> <span
+                                        class="num">400</span>) <span class="op">×</span> n <span class="op">=</span>
+                                    <span class="result">240,000n bits</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">2</div>
+                            <div class="step-content">
+                                <div class="step-label">Convert to kilobytes <span class="dim">(÷ 1024 × 8)</span></div>
+                                <div class="step-eq"><span class="num">240,000n</span> <span class="op">÷</span> (<span
+                                        class="num">1024</span> <span class="op">×</span> <span class="num">8</span>)
+                                    <span class="op">=</span> <span class="result">29.30n KB</span>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="calc-bar-wrap">
+                        <div class="calc-bar" id="bar3"></div>
+                    </div>
+                    <div class="answer-box" id="ans3">
+                        <div class="answer-icon">✦</div>
+                        <div class="answer-text">
+                            <div class="ans-label">Frame Buffer Size</div>
+                            <div class="ans-val">29.30n KB</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Q4 ── -->
+        <div class="q-card" id="q4">
+            <div class="q-header" onclick="toggle('q4')">
+                <span class="q-num">Q.N. 04</span>
+                <h2>RGB raster system, 1024 intensity levels, 1280×1024 resolution — Frame buffer in bits & bytes</h2>
+                <div class="q-toggle">+</div>
+            </div>
+            <div class="q-body">
+                <div class="q-inner">
+                    <div class="viz-area">
+                        <div class="viz-label">▪ RGB Phosphor Dots — 10 bits/pixel across 1280×1024</div>
+                        <canvas class="pixel-canvas" id="canvas4" height="80"></canvas>
+                    </div>
+                    <ul class="steps">
+                        <li class="step">
+                            <div class="step-bullet">1</div>
+                            <div class="step-content">
+                                <div class="step-label">Solve for n bits/pixel</div>
+                                <div class="step-eq"><span class="num">2</span><sup>n</sup> <span class="op">=</span>
+                                    <span class="num">1024</span> &nbsp;→&nbsp; n <span class="op">=</span> <span
+                                        class="result">10 bits</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">2</div>
+                            <div class="step-content">
+                                <div class="step-label">Frame size in bits</div>
+                                <div class="step-eq"><span class="num">10</span> <span class="op">×</span> <span
+                                        class="num">1280</span> <span class="op">×</span> <span class="num">1024</span>
+                                    <span class="op">=</span> <span class="result">13,107,200 bits</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">3</div>
+                            <div class="step-content">
+                                <div class="step-label">Convert to bytes <span class="dim">(÷ 8)</span></div>
+                                <div class="step-eq"><span class="num">13,107,200</span> <span class="op">÷</span> <span
+                                        class="num">8</span> <span class="op">=</span> <span class="result">1,638,400
+                                        bytes</span></div>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="calc-bar-wrap">
+                        <div class="calc-bar" id="bar4"></div>
+                    </div>
+                    <div class="answer-box" id="ans4">
+                        <div class="answer-icon">✦</div>
+                        <div class="answer-text">
+                            <div class="ans-label">Frame Buffer Size</div>
+                            <div class="ans-val">1,638,400 bytes</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Q5 ── -->
+        <div class="q-card" id="q5">
+            <div class="q-header" onclick="toggle('q5')">
+                <span class="q-num">Q.N. 05</span>
+                <h2>RGB 8"×10" screen, 100 pixels/inch, 9 bits/pixel — Storage in bytes</h2>
+                <div class="q-toggle">+</div>
+            </div>
+            <div class="q-body">
+                <div class="q-inner">
+                    <div class="viz-area">
+                        <div class="viz-label">▪ Physical Screen → Pixel Grid Mapping</div>
+                        <canvas class="pixel-canvas" id="canvas5" height="80"></canvas>
+                    </div>
+                    <ul class="steps">
+                        <li class="step">
+                            <div class="step-bullet">1</div>
+                            <div class="step-content">
+                                <div class="step-label">Pixel dimensions</div>
+                                <div class="step-eq">(<span class="num">8</span> <span class="op">×</span> <span
+                                        class="num">100</span>) <span class="op">×</span> (<span class="num">10</span>
+                                    <span class="op">×</span> <span class="num">100</span>) <span class="op">=</span>
+                                    <span class="result">800 × 1000 pixels</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">2</div>
+                            <div class="step-content">
+                                <div class="step-label">Total pixels</div>
+                                <div class="step-eq"><span class="num">800</span> <span class="op">×</span> <span
+                                        class="num">1000</span> <span class="op">=</span> <span class="result">800,000
+                                        pixels</span></div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">3</div>
+                            <div class="step-content">
+                                <div class="step-label">Total bits</div>
+                                <div class="step-eq"><span class="num">800,000</span> <span class="op">×</span> <span
+                                        class="num">9</span> <span class="op">=</span> <span class="result">7,200,000
+                                        bits</span></div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">4</div>
+                            <div class="step-content">
+                                <div class="step-label">Convert to bytes <span class="dim">(÷ 8)</span></div>
+                                <div class="step-eq"><span class="num">7,200,000</span> <span class="op">÷</span> <span
+                                        class="num">8</span> <span class="op">=</span> <span class="result">900,000
+                                        bytes</span></div>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="calc-bar-wrap">
+                        <div class="calc-bar" id="bar5"></div>
+                    </div>
+                    <div class="answer-box" id="ans5">
+                        <div class="answer-icon">✦</div>
+                        <div class="answer-text">
+                            <div class="ans-label">Frame Buffer Storage</div>
+                            <div class="ans-val">900,000 bytes</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Q6 ── -->
+        <div class="q-card" id="q6">
+            <div class="q-header" onclick="toggle('q6')">
+                <span class="q-num">Q.N. 06</span>
+                <h2>Resolution 1024×1280 at 60 fps — Pixels/second accessed & access time per pixel</h2>
+                <div class="q-toggle">+</div>
+            </div>
+            <div class="q-body">
+                <div class="q-inner">
+                    <div class="viz-area">
+                        <div class="viz-label">▪ Frame Rate Scan — 60 frames/sec across 1024×1280</div>
+                        <canvas class="pixel-canvas" id="canvas6" height="80"></canvas>
+                    </div>
+                    <ul class="steps">
+                        <li class="step">
+                            <div class="step-bullet">1</div>
+                            <div class="step-content">
+                                <div class="step-label">Pixels accessed per second</div>
+                                <div class="step-eq"><span class="num">1024</span> <span class="op">×</span> <span
+                                        class="num">1280</span> <span class="op">×</span> <span class="num">60</span>
+                                    <span class="op">=</span> <span class="result">78,643,200 pixels/sec</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">2</div>
+                            <div class="step-content">
+                                <div class="step-label">Access time per pixel</div>
+                                <div class="step-eq"><span class="num">1</span> <span class="op">÷</span> <span
+                                        class="num">78,643,200</span> <span class="op">=</span> <span class="result">≈
+                                        12.71 ns</span></div>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="calc-bar-wrap">
+                        <div class="calc-bar" id="bar6"></div>
+                    </div>
+                    <div class="answer-box" id="ans6">
+                        <div class="answer-icon">✦</div>
+                        <div class="answer-text">
+                            <div class="ans-label">Pixel Access Rate / Time</div>
+                            <div class="ans-val">78.6M px/s · 12.71 ns/px</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Q7 ── -->
+        <div class="q-card" id="q7">
+            <div class="q-header" onclick="toggle('q7')">
+                <span class="q-num">Q.N. 07</span>
+                <h2>640×480 frame buffer, 12 bits/pixel, 10⁵ bits/sec transfer — Load time?</h2>
+                <div class="q-toggle">+</div>
+            </div>
+            <div class="q-body">
+                <div class="q-inner">
+                    <div class="viz-area">
+                        <div class="viz-label">▪ Transfer Rate Visualization — 640×480 @ 12 bpp</div>
+                        <canvas class="pixel-canvas" id="canvas7" height="80"></canvas>
+                    </div>
+                    <ul class="steps">
+                        <li class="step">
+                            <div class="step-bullet">1</div>
+                            <div class="step-content">
+                                <div class="step-label">Total bits in frame buffer</div>
+                                <div class="step-eq"><span class="num">640</span> <span class="op">×</span> <span
+                                        class="num">480</span> <span class="op">×</span> <span class="num">12</span>
+                                    <span class="op">=</span> <span class="result">3,686,400 bits</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">2</div>
+                            <div class="step-content">
+                                <div class="step-label">Load time = total bits ÷ transfer rate</div>
+                                <div class="step-eq"><span class="num">3,686,400</span> <span class="op">÷</span> <span
+                                        class="num">10⁵</span> <span class="op">=</span> <span class="result">36.864
+                                        seconds</span></div>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="calc-bar-wrap">
+                        <div class="calc-bar" id="bar7"></div>
+                    </div>
+                    <div class="answer-box" id="ans7">
+                        <div class="answer-icon">✦</div>
+                        <div class="answer-text">
+                            <div class="ans-label">Load Time</div>
+                            <div class="ans-val">36.864 seconds</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Q8 ── -->
+        <div class="q-card" id="q8">
+            <div class="q-header" onclick="toggle('q8')">
+                <span class="q-num">Q.N. 08</span>
+                <h2>Dual comparison — 640×480 (12 bpp) vs 1280×1024 (24 bpp) at 10⁵ bits/sec transfer</h2>
+                <div class="q-toggle">+</div>
+            </div>
+            <div class="q-body">
+                <div class="q-inner">
+                    <div class="viz-area">
+                        <div class="viz-label">▪ Side-by-Side Buffer Comparison</div>
+                        <canvas class="pixel-canvas" id="canvas8" height="80"></canvas>
+                    </div>
+                    <ul class="steps">
+                        <li class="step">
+                            <div class="step-bullet">A1</div>
+                            <div class="step-content">
+                                <div class="step-label">640×480 @ 12 bpp — total bits</div>
+                                <div class="step-eq"><span class="num">640</span> <span class="op">×</span> <span
+                                        class="num">480</span> <span class="op">×</span> <span class="num">12</span>
+                                    <span class="op">=</span> <span class="result">3,686,400 bits</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">A2</div>
+                            <div class="step-content">
+                                <div class="step-label">Load time — case A</div>
+                                <div class="step-eq"><span class="num">3,686,400</span> <span class="op">÷</span> <span
+                                        class="num">10⁵</span> <span class="op">=</span> <span class="result">36.864
+                                        seconds</span></div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">B1</div>
+                            <div class="step-content">
+                                <div class="step-label">1280×1024 @ 24 bpp — total bits</div>
+                                <div class="step-eq"><span class="num">1280</span> <span class="op">×</span> <span
+                                        class="num">1024</span> <span class="op">×</span> <span class="num">24</span>
+                                    <span class="op">=</span> <span class="result">31,457,280 bits</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">B2</div>
+                            <div class="step-content">
+                                <div class="step-label">Load time — case B</div>
+                                <div class="step-eq"><span class="num">31,457,280</span> <span class="op">÷</span> <span
+                                        class="num">10⁵</span> <span class="op">=</span> <span class="result">314.57
+                                        seconds</span></div>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="calc-bar-wrap">
+                        <div class="calc-bar" id="bar8"></div>
+                    </div>
+                    <div class="answer-box" id="ans8">
+                        <div class="answer-icon">✦</div>
+                        <div class="answer-text">
+                            <div class="ans-label">Load Times</div>
+                            <div class="ans-val">36.86s · 314.57s</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ── Q9 ── -->
+        <div class="q-card" id="q9">
+            <div class="q-header" onclick="toggle('q9')">
+                <span class="q-num">Q.N. 09</span>
+                <h2>8"×10" screen, 100 pixels/inch — Find the Aspect Ratio of the raster system</h2>
+                <div class="q-toggle">+</div>
+            </div>
+            <div class="q-body">
+                <div class="q-inner">
+                    <div class="viz-area">
+                        <div class="viz-label">▪ Screen Dimensions → Pixel Grid → Aspect Ratio</div>
+                        <canvas class="pixel-canvas" id="canvas9" height="80"></canvas>
+                    </div>
+                    <ul class="steps">
+                        <li class="step">
+                            <div class="step-bullet">1</div>
+                            <div class="step-content">
+                                <div class="step-label">Horizontal pixels</div>
+                                <div class="step-eq"><span class="num">8</span> <span class="op">×</span> <span
+                                        class="num">100</span> <span class="op">=</span> <span class="result">800
+                                        pixels</span> <span class="dim">(width)</span></div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">2</div>
+                            <div class="step-content">
+                                <div class="step-label">Vertical pixels</div>
+                                <div class="step-eq"><span class="num">10</span> <span class="op">×</span> <span
+                                        class="num">100</span> <span class="op">=</span> <span class="result">1000
+                                        pixels</span> <span class="dim">(height)</span></div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">3</div>
+                            <div class="step-content">
+                                <div class="step-label">Aspect Ratio = Width ÷ Height</div>
+                                <div class="step-eq"><span class="num">800</span> <span class="op">÷</span> <span
+                                        class="num">1000</span> <span class="op">=</span> <span class="result">0.8
+                                        &nbsp;(4 : 5)</span></div>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="formula-box"><strong>Formula:</strong> Aspect Ratio = Width / Height &nbsp;=&nbsp;
+                        (Screen Width × PPI) / (Screen Height × PPI)</div>
+                    <div class="calc-bar-wrap">
+                        <div class="calc-bar" id="bar9"></div>
+                    </div>
+                    <div class="answer-box" id="ans9">
+                        <div class="answer-icon">✦</div>
+                        <div class="answer-text">
+                            <div class="ans-label">Aspect Ratio</div>
+                            <div class="ans-val">4 : 5 &nbsp;(0.8)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Q10 ── -->
+        <div class="q-card" id="q10">
+            <div class="q-header" onclick="toggle('q10')">
+                <span class="q-num">Q.N. 10</span>
+                <h2>Pixel access time = 20 ns, resolution 1024×800 — Will there be a flickering effect?</h2>
+                <div class="q-toggle">+</div>
+            </div>
+            <div class="q-body">
+                <div class="q-inner">
+                    <div class="viz-area">
+                        <div class="viz-label">▪ Refresh Rate vs 50 Hz Flicker Threshold</div>
+                        <canvas class="pixel-canvas" id="canvas10" height="80"></canvas>
+                    </div>
+                    <ul class="steps">
+                        <li class="step">
+                            <div class="step-bullet">1</div>
+                            <div class="step-content">
+                                <div class="step-label">Time to glow one pixel</div>
+                                <div class="step-eq"><span class="result">20 ns</span> <span class="op">=</span> <span
+                                        class="num">20 × 10⁻⁹</span> seconds</div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">2</div>
+                            <div class="step-content">
+                                <div class="step-label">Time to refresh all pixels</div>
+                                <div class="step-eq"><span class="num">1024</span> <span class="op">×</span> <span
+                                        class="num">800</span> <span class="op">×</span> <span class="num">20 ns</span>
+                                    <span class="op">=</span> <span class="result">16,384,000 ns</span> <span
+                                        class="op">=</span> <span class="result">0.016384 s</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">3</div>
+                            <div class="step-content">
+                                <div class="step-label">Refresh frequency F = 1 / T</div>
+                                <div class="step-eq"><span class="num">1</span> <span class="op">÷</span> <span
+                                        class="num">0.016384</span> <span class="op">=</span> <span class="result">61.05
+                                        Hz</span></div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">4</div>
+                            <div class="step-content">
+                                <div class="step-label">Flicker check — threshold is 50 Hz</div>
+                                <div class="step-eq"><span class="result">61.05 Hz</span> <span class="op">≥</span>
+                                    <span class="num">50 Hz</span> &nbsp;→&nbsp; <span class="result"
+                                        style="color:var(--glow2)">✓ NO FLICKER</span>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="formula-box"><strong>Rule:</strong> If Refresh Rate ≥ 50 Hz (or 60 Hz for CRT) → No
+                        flickering &nbsp;|&nbsp; F = 1/T &nbsp;|&nbsp; T = Total pixels × access time/pixel</div>
+                    <div class="calc-bar-wrap">
+                        <div class="calc-bar" id="bar10"></div>
+                    </div>
+                    <div class="answer-box" id="ans10" style="border-color:var(--glow2)">
+                        <div class="answer-icon">⚡</div>
+                        <div class="answer-text">
+                            <div class="ans-label">Refresh Rate / Flicker</div>
+                            <div class="ans-val">61.05 Hz — No Flicker ✓</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Q11 ── -->
+        <div class="q-card" id="q11">
+            <div class="q-header" onclick="toggle('q11')">
+                <span class="q-num">Q.N. 11</span>
+                <h2>Dual raster systems 640×480 vs 1280×1024 at 60 fps — Pixel access rate & time per pixel</h2>
+                <div class="q-toggle">+</div>
+            </div>
+            <div class="q-body">
+                <div class="q-inner">
+                    <div class="viz-area">
+                        <div class="viz-label">▪ Side-by-Side Raster System Access Rate Comparison</div>
+                        <canvas class="pixel-canvas" id="canvas11" height="80"></canvas>
+                    </div>
+                    <ul class="steps">
+                        <li class="step">
+                            <div class="step-bullet">A1</div>
+                            <div class="step-content">
+                                <div class="step-label">System A — 640×480 pixels/sec</div>
+                                <div class="step-eq"><span class="num">640</span> <span class="op">×</span> <span
+                                        class="num">480</span> <span class="op">×</span> <span class="num">60</span>
+                                    <span class="op">=</span> <span class="result">18,432,000 px/sec</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">A2</div>
+                            <div class="step-content">
+                                <div class="step-label">System A — access time per pixel</div>
+                                <div class="step-eq">Total frame time <span class="op">=</span> <span
+                                        class="num">1/60</span> <span class="op">=</span> <span class="num">0.01667
+                                        s</span><br><span class="num">0.01667</span> <span class="op">÷</span> (<span
+                                        class="num">640</span> <span class="op">×</span> <span class="num">480</span>)
+                                    <span class="op">=</span> <span class="result">54.36 ns</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">B1</div>
+                            <div class="step-content">
+                                <div class="step-label">System B — 1280×1024 pixels/sec</div>
+                                <div class="step-eq"><span class="num">1280</span> <span class="op">×</span> <span
+                                        class="num">1024</span> <span class="op">×</span> <span class="num">60</span>
+                                    <span class="op">=</span> <span class="result">78,643,200 px/sec</span>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="step">
+                            <div class="step-bullet">B2</div>
+                            <div class="step-content">
+                                <div class="step-label">System B — access time per pixel</div>
+                                <div class="step-eq">Total frame time <span class="op">=</span> <span
+                                        class="num">0.01667 s</span><br><span class="num">0.01667</span> <span
+                                        class="op">÷</span> (<span class="num">1280</span> <span class="op">×</span>
+                                    <span class="num">1024</span>) <span class="op">=</span> <span class="result">12.7
+                                        ns</span>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="calc-bar-wrap">
+                        <div class="calc-bar" id="bar11"></div>
+                    </div>
+                    <div class="answer-box" id="ans11">
+                        <div class="answer-icon">✦</div>
+                        <div class="answer-text">
+                            <div class="ans-label">Access Time per Pixel</div>
+                            <div class="ans-val">54.36 ns (A) &nbsp;·&nbsp; 12.7 ns (B)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /container -->
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <!--                  LAWS INTERACTIVE SECTION                  -->
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <div class="laws-section">
+        <div class="laws-hero">
+            <div class="hero-badge" style="margin-bottom:16px">◈ Interactive Reference ◈</div>
+            <h2 class="laws-title">Computer Graphics Laws</h2>
+            <p class="laws-sub">10 fundamental laws · click any card · use the live calculator</p>
+        </div>
+
+        <!-- LAW CARDS GRID -->
+        <div class="laws-grid" id="lawsGrid">
+
+            <div class="law-card" data-law="pixels" onclick="selectLaw('pixels')">
+                <div class="law-num">①</div>
+                <div class="law-icon">⊞</div>
+                <div class="law-name">Number of Pixels</div>
+                <div class="law-formula">Pixels = W × H</div>
+            </div>
+
+            <div class="law-card" data-law="framebuffer" onclick="selectLaw('framebuffer')">
+                <div class="law-num">②</div>
+                <div class="law-icon">◫</div>
+                <div class="law-name">Frame Buffer Size</div>
+                <div class="law-formula">Size = Pixels × BPP</div>
+            </div>
+
+            <div class="law-card" data-law="units" onclick="selectLaw('units')">
+                <div class="law-num">③</div>
+                <div class="law-icon">⇄</div>
+                <div class="law-name">Unit Conversions</div>
+                <div class="law-formula">8 bits → 1 Byte → KB → MB</div>
+            </div>
+
+            <div class="law-card" data-law="bpp" onclick="selectLaw('bpp')">
+                <div class="law-num">④</div>
+                <div class="law-icon">⬛</div>
+                <div class="law-name">Bits per Pixel</div>
+                <div class="law-formula">2ⁿ = Colors → solve n</div>
+            </div>
+
+            <div class="law-card" data-law="pixpersec" onclick="selectLaw('pixpersec')">
+                <div class="law-num">⑤</div>
+                <div class="law-icon">▶</div>
+                <div class="law-name">Pixels per Second</div>
+                <div class="law-formula">px/s = Res × FPS</div>
+            </div>
+
+            <div class="law-card" data-law="accesstime" onclick="selectLaw('accesstime')">
+                <div class="law-num">⑥</div>
+                <div class="law-icon">⏱</div>
+                <div class="law-name">Access Time/Pixel</div>
+                <div class="law-formula">t = 1 / px/sec</div>
+            </div>
+
+            <div class="law-card" data-law="frametime" onclick="selectLaw('frametime')">
+                <div class="law-num">⑦</div>
+                <div class="law-icon">⧖</div>
+                <div class="law-name">Frame Refresh Time</div>
+                <div class="law-formula">T = Pixels × t/pixel</div>
+            </div>
+
+            <div class="law-card" data-law="flicker" onclick="selectLaw('flicker')">
+                <div class="law-num">⑧</div>
+                <div class="law-icon">⚡</div>
+                <div class="law-name">Flickering Condition</div>
+                <div class="law-formula">F ≥ 60 Hz → No Flicker</div>
+            </div>
+
+            <div class="law-card" data-law="aspect" onclick="selectLaw('aspect')">
+                <div class="law-num">⑨</div>
+                <div class="law-icon">▭</div>
+                <div class="law-name">Aspect Ratio</div>
+                <div class="law-formula">AR = Width / Height</div>
+            </div>
+
+            <div class="law-card" data-law="resinch" onclick="selectLaw('resinch')">
+                <div class="law-num">⑩</div>
+                <div class="law-icon">📐</div>
+                <div class="law-name">Resolution from Inches</div>
+                <div class="law-formula">Pixels = Size × PPI</div>
+            </div>
+
+        </div><!-- /laws-grid -->
+
+        <!-- CALCULATOR PANEL -->
+        <div class="calc-panel" id="calcPanel">
+            <div class="calc-header">
+                <span class="calc-law-label" id="calcLawLabel">← Select a law above</span>
+                <span class="calc-close" onclick="closeLaw()">✕</span>
+            </div>
+
+            <!-- Law detail explanation -->
+            <div class="law-detail" id="lawDetail">
+                <div class="law-detail-formula" id="lawDetailFormula"></div>
+                <div class="law-detail-desc" id="lawDetailDesc"></div>
+            </div>
+
+            <!-- Inputs -->
+            <div class="calc-inputs" id="calcInputs"></div>
+
+            <!-- Calculate button -->
+            <button class="calc-btn" id="calcBtn" onclick="calculate()" style="display:none">▶ &nbsp;CALCULATE</button>
+
+            <!-- Result display -->
+            <div class="calc-result" id="calcResult" style="display:none">
+                <div class="calc-result-label">RESULT</div>
+                <div class="calc-result-val" id="calcResultVal"></div>
+                <div class="calc-result-steps" id="calcResultSteps"></div>
+            </div>
+
+            <!-- Mini canvas for selected law -->
+            <canvas id="lawCanvas" class="law-canvas" style="display:none"></canvas>
+        </div><!-- /calc-panel -->
+
+    </div><!-- /laws-section -->
+
+    <script>
+        // ─── STARS ───
+        (function () {
+            const c = document.getElementById('stars');
+            for (let i = 0; i < 140; i++) {
+                const s = document.createElement('div');
+                s.className = 'star';
+                s.style.cssText = `left:${Math.random() * 100}%;top:${Math.random() * 100}%;--d:${2 + Math.random() * 5}s;--o:${0.3 + Math.random() * 0.7};animation-delay:${Math.random() * 6}s`;
+                c.appendChild(s);
+            }
+        })();
+
+        // ─── CANVAS RENDERERS ───
+        const colors = ['#00d4ff', '#00ff9d', '#ff6b35', '#ffdd57', '#c678dd', '#e06c75', '#56b6c2', '#98c379'];
+
+        function drawRGBBits(id, bpp) {
+            const cvs = document.getElementById(id);
+            if (!cvs) return;
+            const ctx = cvs.getContext('2d');
+            const W = cvs.offsetWidth || 500, H = 80;
+            cvs.width = W; cvs.height = H;
+            const cols = Math.floor(W / 6);
+            for (let x = 0; x < cols; x++) {
+                const h = 10 + Math.random() * (H - 14);
+                const c = colors[x % colors.length];
+                ctx.fillStyle = c + '33';
+                ctx.fillRect(x * 6, H - h, 5, h);
+                ctx.fillStyle = c;
+                ctx.fillRect(x * 6, H - h, 5, 2);
+            }
+            // bpp indicator
+            for (let b = 0; b < bpp; b++) {
+                const x = (b / bpp) * W;
+                ctx.strokeStyle = 'rgba(0,212,255,0.2)';
+                ctx.setLineDash([2, 4]);
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+            }
+        }
+
+        function drawIntensityGradient(id) {
+            const cvs = document.getElementById(id);
+            if (!cvs) return;
+            const ctx = cvs.getContext('2d');
+            const W = cvs.offsetWidth || 500, H = 80;
+            cvs.width = W; cvs.height = H;
+            const grad = ctx.createLinearGradient(0, 0, W, 0);
+            grad.addColorStop(0, '#000');
+            grad.addColorStop(0.5, '#00d4ff');
+            grad.addColorStop(1, '#fff');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 20, W, 40);
+            // tick marks for 1024 levels
+            for (let i = 0; i <= 10; i++) {
+                const x = (i / 10) * W;
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                ctx.setLineDash([]);
+                ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(x, 15); ctx.lineTo(x, 65); ctx.stroke();
+                ctx.fillStyle = '#ffdd57';
+                ctx.font = '9px Share Tech Mono';
+                ctx.textAlign = 'center';
+                ctx.fillText(Math.round(i * 102.4), x, 12);
+            }
+        }
+
+        function drawPixelGrid(id, w, h) {
+            const cvs = document.getElementById(id);
+            if (!cvs) return;
+            const ctx = cvs.getContext('2d');
+            const W = cvs.offsetWidth || 500, H = 80;
+            cvs.width = W; cvs.height = H;
+            const cols = Math.min(80, w), rows = Math.min(6, h);
+            const cw = W / cols, rh = H / rows;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const col = colors[Math.floor(Math.random() * colors.length)];
+                    ctx.fillStyle = col + (Math.random() > 0.7 ? 'cc' : '44');
+                    ctx.fillRect(c * cw + 0.5, r * rh + 0.5, cw - 1, rh - 1);
+                }
+            }
+        }
+
+        function drawTransferViz(id, total, rate) {
+            const cvs = document.getElementById(id);
+            if (!cvs) return;
+            const ctx = cvs.getContext('2d');
+            const W = cvs.offsetWidth || 500, H = 80;
+            cvs.width = W; cvs.height = H;
+            // wave-like bits streaming
+            ctx.fillStyle = 'rgba(0,212,255,0.08)';
+            ctx.fillRect(0, 0, W, H);
+            const seg = W / 40;
+            for (let i = 0; i < 40; i++) {
+                const y = H / 2 + Math.sin(i * 0.4) * 20;
+                const w2 = 3 + Math.random() * 4;
+                ctx.fillStyle = i % 2 === 0 ? '#00d4ff88' : '#00ff9d44';
+                ctx.beginPath();
+                ctx.roundRect(i * seg + 1, y - w2, seg - 2, w2 * 2, 2);
+                ctx.fill();
+            }
+            // progress bar
+            const frac = Math.min(1, total / (rate * 400));
+            ctx.fillStyle = 'rgba(255,107,53,0.15)';
+            ctx.fillRect(0, H - 14, W * frac, 10);
+            ctx.fillStyle = '#ff6b35';
+            ctx.fillRect(0, H - 14, W * frac, 2);
+        }
+
+        function drawScanViz(id) {
+            const cvs = document.getElementById(id);
+            if (!cvs) return;
+            const ctx = cvs.getContext('2d');
+            const W = cvs.offsetWidth || 500, H = 80;
+            cvs.width = W; cvs.height = H;
+            for (let y = 0; y < H; y += 4) {
+                const alpha = 0.05 + (y / H) * 0.2;
+                ctx.fillStyle = `rgba(0,212,255,${alpha})`;
+                ctx.fillRect(0, y, W, 2);
+            }
+            // scan beam
+            ctx.fillStyle = 'rgba(0,255,157,0.5)';
+            ctx.fillRect(0, 36, W, 2);
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00ff9d';
+            ctx.fillRect(0, 36, W, 2);
+            ctx.shadowBlur = 0;
+        }
+
+        function drawDualBuffer(id) {
+            const cvs = document.getElementById(id);
+            if (!cvs) return;
+            const ctx = cvs.getContext('2d');
+            const W = cvs.offsetWidth || 500, H = 80;
+            cvs.width = W; cvs.height = H;
+            // Left half – smaller buffer
+            ctx.fillStyle = 'rgba(0,212,255,0.1)';
+            ctx.fillRect(4, 4, W / 2 - 8, H - 8);
+            ctx.strokeStyle = '#00d4ff88';
+            ctx.lineWidth = 1; ctx.setLineDash([]);
+            ctx.strokeRect(4, 4, W / 2 - 8, H - 8);
+            ctx.fillStyle = '#00d4ff';
+            ctx.font = 'bold 11px Share Tech Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('640×480 · 12bpp', W / 4, H / 2 - 4);
+            ctx.fillStyle = '#ffdd57';
+            ctx.font = '10px Share Tech Mono';
+            ctx.fillText('36.864 sec', W / 4, H / 2 + 10);
+            // Right half – larger buffer
+            ctx.fillStyle = 'rgba(255,107,53,0.1)';
+            ctx.fillRect(W / 2 + 4, 4, W / 2 - 8, H - 8);
+            ctx.strokeStyle = '#ff6b3588';
+            ctx.strokeRect(W / 2 + 4, 4, W / 2 - 8, H - 8);
+            ctx.fillStyle = '#ff6b35';
+            ctx.font = 'bold 11px Share Tech Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('1280×1024 · 24bpp', W * 3 / 4, H / 2 - 4);
+            ctx.fillStyle = '#ffdd57';
+            ctx.font = '10px Share Tech Mono';
+            ctx.fillText('314.57 sec', W * 3 / 4, H / 2 + 10);
+        }
+
+        // ─── TOGGLE & ANIMATE ───
+        const openCards = new Set();
+
+        function toggle(id) {
+            const card = document.getElementById(id);
+            const isOpen = card.classList.toggle('open');
+            if (isOpen) {
+                openCards.add(id);
+                setTimeout(() => animateCard(id), 60);
+                const bar = document.getElementById('bar' + id.replace('q', ''));
+                if (bar) setTimeout(() => bar.style.width = '100%', 120);
+            }
+        }
+
+        function animateCard(id) {
+            const card = document.getElementById(id);
+            const steps = card.querySelectorAll('.step');
+            steps.forEach((s, i) => {
+                setTimeout(() => s.classList.add('appear'), i * 150);
+            });
+            const ans = card.querySelector('.answer-box');
+            if (ans) setTimeout(() => ans.classList.add('appear'), steps.length * 150 + 200);
+
+            // draw canvas
+            const n = id.replace('q', '');
+            switch (id) {
+                case 'q1': setTimeout(() => drawRGBBits('canvas1', 24), 100); break;
+                case 'q2': setTimeout(() => drawIntensityGradient('canvas2'), 100); break;
+                case 'q3': setTimeout(() => drawPixelGrid('canvas3', 600, 400), 100); break;
+                case 'q4': setTimeout(() => drawPixelGrid('canvas4', 1280, 1024), 100); break;
+                case 'q5': setTimeout(() => drawPixelGrid('canvas5', 800, 1000), 100); break;
+                case 'q6': setTimeout(() => drawScanViz('canvas6'), 100); break;
+                case 'q7': setTimeout(() => drawTransferViz('canvas7', 3686400, 100000), 100); break;
+                case 'q8': setTimeout(() => drawDualBuffer('canvas8'), 100); break;
+                case 'q9': setTimeout(() => drawAspectRatioViz('canvas9'), 100); break;
+                case 'q10': setTimeout(() => drawFlickerViz('canvas10'), 100); break;
+                case 'q11': setTimeout(() => drawDualAccessViz('canvas11'), 100); break;
+            }
+        }
+
+        // ─── INTERSECTION OBSERVER FOR CARD FADE-IN ───
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+                if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.q-card').forEach(c => io.observe(c));
+
+        // ─── REDRAW ON RESIZE ───
+        window.addEventListener('resize', () => {
+            openCards.forEach(id => {
+                switch (id) {
+                    case 'q1': drawRGBBits('canvas1', 24); break;
+                    case 'q2': drawIntensityGradient('canvas2'); break;
+                    case 'q3': drawPixelGrid('canvas3', 600, 400); break;
+                    case 'q4': drawPixelGrid('canvas4', 1280, 1024); break;
+                    case 'q5': drawPixelGrid('canvas5', 800, 1000); break;
+                    case 'q6': drawScanViz('canvas6'); break;
+                    case 'q7': drawTransferViz('canvas7', 3686400, 100000); break;
+                    case 'q8': drawDualBuffer('canvas8'); break;
+                    case 'q9': drawAspectRatioViz('canvas9'); break;
+                    case 'q10': drawFlickerViz('canvas10'); break;
+                    case 'q11': drawDualAccessViz('canvas11'); break;
+                }
+            });
+        });
+
+        // ─── NEW CANVAS FUNCTIONS ───
+        function drawAspectRatioViz(id) {
+            const cvs = document.getElementById(id);
+            if (!cvs) return;
+            const ctx = cvs.getContext('2d');
+            const W = cvs.offsetWidth || 500, H = 80;
+            cvs.width = W; cvs.height = H;
+            ctx.clearRect(0, 0, W, H);
+            // Draw two rectangles showing 8x10 and the ratio
+            const pw = 80, ph = 100; // proportional 8x10
+            const scale = (H - 16) / ph;
+            const rw = pw * scale, rh = ph * scale;
+            const cx = W / 2;
+            // Screen outline
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([]);
+            ctx.strokeRect(cx - rw / 2, 8, rw, rh);
+            ctx.fillStyle = 'rgba(0,212,255,0.07)';
+            ctx.fillRect(cx - rw / 2, 8, rw, rh);
+            // Labels
+            ctx.fillStyle = '#ffdd57';
+            ctx.font = 'bold 10px Share Tech Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('8"', cx, H - 2);
+            ctx.save();
+            ctx.translate(cx - rw / 2 - 12, H / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('10"', 0, 0);
+            ctx.restore();
+            ctx.fillStyle = '#00ff9d';
+            ctx.font = 'bold 13px Share Tech Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('4:5', cx, H / 2 + 5);
+            // Width/Height arrows
+            ctx.strokeStyle = '#00d4ff44';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath(); ctx.moveTo(20, H / 2); ctx.lineTo(cx - rw / 2 - 2, H / 2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(cx + rw / 2 + 2, H / 2); ctx.lineTo(W - 20, H / 2); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawFlickerViz(id) {
+            const cvs = document.getElementById(id);
+            if (!cvs) return;
+            const ctx = cvs.getContext('2d');
+            const W = cvs.offsetWidth || 500, H = 80;
+            cvs.width = W; cvs.height = H;
+            ctx.clearRect(0, 0, W, H);
+            // Hz scale bar
+            const maxHz = 120;
+            const thresh50 = (50 / maxHz) * W;
+            const thresh60 = (60 / maxHz) * W;
+            const hz = (61.05 / maxHz) * W;
+            // bg
+            ctx.fillStyle = 'rgba(255,0,0,0.08)';
+            ctx.fillRect(0, 28, thresh60, 24);
+            ctx.fillStyle = 'rgba(0,255,157,0.1)';
+            ctx.fillRect(thresh60, 28, W - thresh60, 24);
+            // bar
+            const grd = ctx.createLinearGradient(0, 0, W, 0);
+            grd.addColorStop(0, '#ff3333');
+            grd.addColorStop(thresh60 / W, '#ffdd57');
+            grd.addColorStop(1, '#00ff9d');
+            ctx.fillStyle = grd;
+            ctx.fillRect(0, 34, hz, 12);
+            // 50 Hz marker
+            ctx.strokeStyle = '#ffdd57';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath(); ctx.moveTo(thresh50, 18); ctx.lineTo(thresh50, 60); ctx.stroke();
+            ctx.fillStyle = '#ffdd57';
+            ctx.font = '9px Share Tech Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('50 Hz', thresh50, 14);
+            // 60 Hz marker
+            ctx.strokeStyle = '#00ff9d';
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath(); ctx.moveTo(thresh60, 18); ctx.lineTo(thresh60, 60); ctx.stroke();
+            ctx.fillStyle = '#00ff9d';
+            ctx.fillText('60 Hz', thresh60, 14);
+            // our value
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([]);
+            ctx.beginPath(); ctx.moveTo(hz, 20); ctx.lineTo(hz, 62); ctx.stroke();
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 10px Share Tech Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText('61.05 Hz ✓', hz + 4, 14);
+            // flicker / no flicker labels
+            ctx.fillStyle = '#ff666699';
+            ctx.font = '9px Share Tech Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('FLICKER', thresh60 / 2, 70);
+            ctx.fillStyle = '#00ff9d99';
+            ctx.fillText('NO FLICKER', thresh60 + (W - thresh60) / 2, 70);
+        }
+
+        function drawDualAccessViz(id) {
+            const cvs = document.getElementById(id);
+            if (!cvs) return;
+            const ctx = cvs.getContext('2d');
+            const W = cvs.offsetWidth || 500, H = 80;
+            cvs.width = W; cvs.height = H;
+            ctx.clearRect(0, 0, W, H);
+            const mid = W / 2 - 1;
+            // Panel A
+            ctx.fillStyle = 'rgba(0,212,255,0.06)';
+            ctx.fillRect(4, 4, mid - 8, H - 8);
+            ctx.strokeStyle = '#00d4ff66';
+            ctx.lineWidth = 1; ctx.setLineDash([]);
+            ctx.strokeRect(4, 4, mid - 8, H - 8);
+            ctx.fillStyle = '#00d4ff';
+            ctx.font = 'bold 10px Share Tech Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('640×480 @ 60fps', mid / 2, 26);
+            ctx.fillStyle = '#ffdd57';
+            ctx.font = '11px Share Tech Mono';
+            ctx.fillText('18,432,000 px/s', mid / 2, 44);
+            ctx.fillStyle = '#00ff9d';
+            ctx.font = 'bold 12px Share Tech Mono';
+            ctx.fillText('54.36 ns/pixel', mid / 2, 64);
+            // divider
+            ctx.strokeStyle = '#0d3a6e';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(mid, 8); ctx.lineTo(mid, H - 8); ctx.stroke();
+            // Panel B
+            ctx.fillStyle = 'rgba(255,107,53,0.06)';
+            ctx.fillRect(mid + 5, 4, W - mid - 9, H - 8);
+            ctx.strokeStyle = '#ff6b3566';
+            ctx.strokeRect(mid + 5, 4, W - mid - 9, H - 8);
+            ctx.fillStyle = '#ff6b35';
+            ctx.font = 'bold 10px Share Tech Mono';
+            ctx.textAlign = 'center';
+            ctx.fillText('1280×1024 @ 60fps', mid + (W - mid) / 2, 26);
+            ctx.fillStyle = '#ffdd57';
+            ctx.font = '11px Share Tech Mono';
+            ctx.fillText('78,643,200 px/s', mid + (W - mid) / 2, 44);
+            ctx.fillStyle = '#00ff9d';
+            ctx.font = 'bold 12px Share Tech Mono';
+            ctx.fillText('12.7 ns/pixel', mid + (W - mid) / 2, 64);
+        }
+
+        // ─── LAWS INTERACTIVE CALCULATOR ───
+        const LAWS = {
+            pixels: {
+                label: '① Number of Pixels',
+                formula: 'Pixels = Width × Height',
+                desc: 'The total number of pixels in a display is simply the product of its horizontal and vertical resolution.',
+                inputs: [
+                    { id: 'w', label: 'Width (px)', placeholder: 'e.g. 1024' },
+                    { id: 'h', label: 'Height (px)', placeholder: 'e.g. 768' }
+                ],
+                calc(v) {
+                    const W = +v.w, H = +v.h;
+                    if (!W || !H) return null;
+                    const px = W * H;
+                    return {
+                        val: px.toLocaleString() + ' pixels',
+                        steps: `Width   = ${W.toLocaleString()}\nHeight  = ${H.toLocaleString()}\n──────────────────────\nPixels  = ${W.toLocaleString()} × ${H.toLocaleString()} = ${px.toLocaleString()}`
+                    };
+                }
+            },
+            framebuffer: {
+                label: '② Frame Buffer Size',
+                formula: 'Size(bits) = W × H × BPP\nSize(bytes) = Size(bits) ÷ 8\nSize(KB) = Size(bytes) ÷ 1024\nSize(MB) = Size(KB) ÷ 1024',
+                desc: 'Frame buffer stores color info for every pixel. Multiply total pixels by bits-per-pixel for total bits, then convert.',
+                inputs: [
+                    { id: 'w', label: 'Width (px)', placeholder: 'e.g. 1024' },
+                    { id: 'h', label: 'Height (px)', placeholder: 'e.g. 1024' },
+                    { id: 'bpp', label: 'Bits per Pixel', placeholder: 'e.g. 24' }
+                ],
+                calc(v) {
+                    const W = +v.w, H = +v.h, bpp = +v.bpp;
+                    if (!W || !H || !bpp) return null;
+                    const bits = W * H * bpp, bytes = bits / 8, kb = bytes / 1024, mb = kb / 1024;
+                    return {
+                        val: mb.toFixed(4) + ' MB',
+                        steps: `Pixels  = ${W}×${H} = ${(W * H).toLocaleString()}\n──────────────────────────────\nBits    = ${(W * H).toLocaleString()} × ${bpp} = ${bits.toLocaleString()} bits\nBytes   = ${bits.toLocaleString()} ÷ 8 = ${bytes.toLocaleString()} bytes\nKB      = ${bytes.toLocaleString()} ÷ 1024 = ${kb.toFixed(2)} KB\nMB      = ${kb.toFixed(2)} ÷ 1024 = ${mb.toFixed(4)} MB`
+                    };
+                }
+            },
+            units: {
+                label: '③ Unit Conversions',
+                formula: '1 Byte = 8 bits\n1 KB = 1024 Bytes\n1 MB = 1024 KB = 1,048,576 Bytes',
+                desc: 'Convert between bits, bytes, KB, and MB. Enter a value and select source unit.',
+                inputs: [
+                    { id: 'val', label: 'Value', placeholder: 'e.g. 25165824' },
+                    { id: 'from', label: 'From Unit', type: 'select', opts: ['bits', 'bytes', 'KB', 'MB'] }
+                ],
+                calc(v) {
+                    const n = +v.val, from = v.from;
+                    if (!n || !from) return null;
+                    let bits;
+                    if (from === 'bits') bits = n;
+                    else if (from === 'bytes') bits = n * 8;
+                    else if (from === 'KB') bits = n * 1024 * 8;
+                    else bits = n * 1024 * 1024 * 8;
+                    const bytes = bits / 8, kb = bytes / 1024, mb = kb / 1024;
+                    return {
+                        val: `${bits.toLocaleString()} bits`,
+                        steps: `Input   = ${n.toLocaleString()} ${from}\n──────────────────────────────\nBits    = ${bits.toLocaleString()} bits\nBytes   = ${bytes.toLocaleString()} bytes\nKB      = ${kb.toFixed(4)} KB\nMB      = ${mb.toFixed(6)} MB`
+                    };
+                }
+            },
+            bpp: {
+                label: '④ Bits per Pixel',
+                formula: '2ⁿ = Number of intensity levels\n→ n = log₂(levels)',
+                desc: 'Given the number of intensity/color levels a pixel can represent, find how many bits are needed per pixel.',
+                inputs: [
+                    { id: 'levels', label: 'Intensity Levels (colors)', placeholder: 'e.g. 1024' }
+                ],
+                calc(v) {
+                    const lvl = +v.levels;
+                    if (!lvl) return null;
+                    const n = Math.log2(lvl);
+                    const exact = Number.isInteger(n);
+                    return {
+                        val: `n = ${n.toFixed(4)} bits/pixel`,
+                        steps: `2ⁿ = ${lvl.toLocaleString()}\nn  = log₂(${lvl}) = ${n.toFixed(4)}\n──────────────────────────────\n${exact ? '✓ Exact power of 2' : '⚠ Not exact power — round up to ' + Math.ceil(n)}`
+                    };
+                }
+            },
+            pixpersec: {
+                label: '⑤ Pixels per Second',
+                formula: 'Pixels/sec = Width × Height × FPS',
+                desc: 'How many individual pixel accesses a display controller must perform per second to maintain a given frame rate.',
+                inputs: [
+                    { id: 'w', label: 'Width (px)', placeholder: 'e.g. 1280' },
+                    { id: 'h', label: 'Height (px)', placeholder: 'e.g. 1024' },
+                    { id: 'fps', label: 'Frame Rate (fps)', placeholder: 'e.g. 60' }
+                ],
+                calc(v) {
+                    const W = +v.w, H = +v.h, fps = +v.fps;
+                    if (!W || !H || !fps) return null;
+                    const pps = W * H * fps;
+                    return {
+                        val: pps.toLocaleString() + ' px/sec',
+                        steps: `Resolution = ${W}×${H} = ${(W * H).toLocaleString()} pixels\nFPS        = ${fps}\n──────────────────────────────\nPx/sec     = ${(W * H).toLocaleString()} × ${fps} = ${pps.toLocaleString()}`
+                    };
+                }
+            },
+            accesstime: {
+                label: '⑥ Access Time per Pixel',
+                formula: 'Time/pixel = 1 / (W × H × FPS)\n           = Frame time / (W × H)',
+                desc: 'The time available for the display controller to read one pixel from frame buffer and send it to the screen.',
+                inputs: [
+                    { id: 'w', label: 'Width (px)', placeholder: 'e.g. 1024' },
+                    { id: 'h', label: 'Height (px)', placeholder: 'e.g. 800' },
+                    { id: 'fps', label: 'Frame Rate (fps)', placeholder: 'e.g. 60' }
+                ],
+                calc(v) {
+                    const W = +v.w, H = +v.h, fps = +v.fps;
+                    if (!W || !H || !fps) return null;
+                    const pps = W * H * fps, t = 1 / pps, tns = t * 1e9;
+                    return {
+                        val: tns.toFixed(4) + ' ns/pixel',
+                        steps: `Px/sec     = ${W}×${H}×${fps} = ${pps.toLocaleString()}\n──────────────────────────────\nTime/px    = 1 / ${pps.toLocaleString()}\n           = ${t.toExponential(4)} sec\n           = ${tns.toFixed(4)} ns`
+                    };
+                }
+            },
+            frametime: {
+                label: '⑦ Frame Refresh Time',
+                formula: 'Frame time = Total pixels × Access time/pixel\n           = 1 / FPS',
+                desc: 'The total time needed to refresh (redraw) one complete frame on the screen.',
+                inputs: [
+                    { id: 'w', label: 'Width (px)', placeholder: 'e.g. 1024' },
+                    { id: 'h', label: 'Height (px)', placeholder: 'e.g. 800' },
+                    { id: 't', label: 'Access time/pixel (ns)', placeholder: 'e.g. 20' }
+                ],
+                calc(v) {
+                    const W = +v.w, H = +v.h, tns = +v.t;
+                    if (!W || !H || !tns) return null;
+                    const totalPx = W * H, tTotal = totalPx * tns * 1e-9;
+                    return {
+                        val: tTotal.toFixed(6) + ' seconds',
+                        steps: `Total pixels = ${W}×${H} = ${totalPx.toLocaleString()}\nAccess time  = ${tns} ns = ${tns}×10⁻⁹ s\n──────────────────────────────\nFrame time   = ${totalPx.toLocaleString()} × ${tns}ns\n             = ${(totalPx * tns).toLocaleString()} ns\n             = ${tTotal.toFixed(6)} seconds`
+                    };
+                }
+            },
+            flicker: {
+                label: '⑧ Flickering Condition',
+                formula: 'F = 1 / T  (T = total frame time)\nIf F ≥ 60 Hz → No Flicker ✅\nIf F < 60 Hz → Flicker ❌',
+                desc: 'Human eye perceives flicker below ~50–60 Hz. If refresh rate is above this threshold, the screen appears steady.',
+                inputs: [
+                    { id: 'w', label: 'Width (px)', placeholder: 'e.g. 1024' },
+                    { id: 'h', label: 'Height (px)', placeholder: 'e.g. 800' },
+                    { id: 't', label: 'Access time/pixel (ns)', placeholder: 'e.g. 20' }
+                ],
+                calc(v) {
+                    const W = +v.w, H = +v.h, tns = +v.t;
+                    if (!W || !H || !tns) return null;
+                    const totalPx = W * H, T = totalPx * tns * 1e-9, F = 1 / T;
+                    const ok = F >= 60;
+                    return {
+                        val: F.toFixed(2) + ' Hz — ' + (ok ? 'NO FLICKER ✅' : 'FLICKER ❌'),
+                        steps: `Pixels   = ${W}×${H} = ${totalPx.toLocaleString()}\nT        = ${totalPx.toLocaleString()} × ${tns}ns = ${(T * 1000).toFixed(4)} ms\n──────────────────────────────\nF = 1/T  = 1/${T.toFixed(6)}\n         = ${F.toFixed(4)} Hz\nThreshold: 60 Hz\nResult:   ${ok ? '✅ No Flicker' : '❌ Flickering'}`
+                    };
+                }
+            },
+            aspect: {
+                label: '⑨ Aspect Ratio',
+                formula: 'AR = Width / Height\n(can be expressed as W:H)',
+                desc: 'Aspect ratio describes the proportional relationship between width and height. Common values: 4:3, 16:9, 16:10.',
+                inputs: [
+                    { id: 'w', label: 'Width (px or inch)', placeholder: 'e.g. 800' },
+                    { id: 'h', label: 'Height (px or inch)', placeholder: 'e.g. 1000' }
+                ],
+                calc(v) {
+                    const W = +v.w, H = +v.h;
+                    if (!W || !H) return null;
+                    const g = gcd(W, H), rw = W / g, rh = H / g, ratio = (W / H).toFixed(4);
+                    return {
+                        val: `${rw} : ${rh}  (${ratio})`,
+                        steps: `Width  = ${W}\nHeight = ${H}\nGCD    = ${g}\n──────────────────────────────\nAR     = ${W}/${H} = ${ratio}\nSimple = ${rw}:${rh}`
+                    };
+                }
+            },
+            resinch: {
+                label: '⑩ Resolution from Inches',
+                formula: 'Pixels = Size(inch) × PPI\nTotal = W_px × H_px',
+                desc: 'Convert a physical screen size (in inches) and pixel density (PPI) to the actual pixel resolution.',
+                inputs: [
+                    { id: 'wi', label: 'Screen Width (inches)', placeholder: 'e.g. 8' },
+                    { id: 'hi', label: 'Screen Height (inches)', placeholder: 'e.g. 10' },
+                    { id: 'ppi', label: 'Pixels per Inch (PPI)', placeholder: 'e.g. 100' }
+                ],
+                calc(v) {
+                    const wi = +v.wi, hi = +v.hi, ppi = +v.ppi;
+                    if (!wi || !hi || !ppi) return null;
+                    const wp = wi * ppi, hp = hi * ppi, tot = wp * hp;
+                    return {
+                        val: `${wp.toLocaleString()} × ${hp.toLocaleString()} = ${tot.toLocaleString()} px`,
+                        steps: `Width  = ${wi}" × ${ppi} PPI = ${wp.toLocaleString()} px\nHeight = ${hi}" × ${ppi} PPI = ${hp.toLocaleString()} px\n──────────────────────────────\nTotal  = ${wp.toLocaleString()} × ${hp.toLocaleString()} = ${tot.toLocaleString()} pixels`
+                    };
+                }
+            }
+        };
+
+        function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+
+        let currentLaw = null;
+
+        function selectLaw(key) {
+            document.querySelectorAll('.law-card').forEach(c => c.classList.remove('active'));
+            document.querySelector(`[data-law="${key}"]`).classList.add('active');
+            currentLaw = key;
+            const law = LAWS[key];
+            const panel = document.getElementById('calcPanel');
+            panel.classList.add('show');
+
+            document.getElementById('calcLawLabel').textContent = law.label;
+            document.getElementById('lawDetailFormula').innerHTML = law.formula.replace(/\n/g, '<br>');
+            document.getElementById('lawDetailDesc').textContent = law.desc;
+
+            // Build inputs
+            const inp = document.getElementById('calcInputs');
+            inp.innerHTML = '';
+            law.inputs.forEach(i => {
+                const g = document.createElement('div');
+                g.className = 'inp-group';
+                if (i.type === 'select') {
+                    g.innerHTML = `<label>${i.label}</label><select id="inp_${i.id}">${i.opts.map(o => `<option>${o}</option>`).join('')}</select>`;
+                } else {
+                    g.innerHTML = `<label>${i.label}</label><input id="inp_${i.id}" type="number" placeholder="${i.placeholder}" oninput="liveCalc()">`;
+                }
+                inp.appendChild(g);
+            });
+
+            document.getElementById('calcBtn').style.display = 'block';
+            document.getElementById('calcResult').style.display = 'none';
+
+            // Draw law canvas
+            const lc = document.getElementById('lawCanvas');
+            lc.style.display = 'block';
+            setTimeout(() => drawLawCanvas(key), 60);
+
+            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function closeLaw() {
+            document.querySelectorAll('.law-card').forEach(c => c.classList.remove('active'));
+            document.getElementById('calcPanel').classList.remove('show');
+            currentLaw = null;
+        }
+
+        function liveCalc() {
+            if (!currentLaw) return;
+            const law = LAWS[currentLaw];
+            const vals = {};
+            law.inputs.forEach(i => {
+                const el = document.getElementById('inp_' + i.id);
+                vals[i.id] = el ? el.value : '';
+            });
+            const allFilled = Object.values(vals).every(v => v !== '');
+            if (allFilled) calculate(vals);
+        }
+
+        function calculate(preVals) {
+            if (!currentLaw) return;
+            const law = LAWS[currentLaw];
+            const vals = preVals || {};
+            if (!preVals) {
+                law.inputs.forEach(i => {
+                    const el = document.getElementById('inp_' + i.id);
+                    vals[i.id] = el ? el.value : '';
+                });
+            }
+            const result = law.calc(vals);
+            const resEl = document.getElementById('calcResult');
+            if (!result) {
+                resEl.style.display = 'none';
+                return;
+            }
+            document.getElementById('calcResultVal').textContent = result.val;
+            // Format steps with color spans
+            const stepsDiv = document.getElementById('calcResultSteps');
+            stepsDiv.innerHTML = result.steps
+                .replace(/=([^=\n]+)$/gm, (m, v) => `= <span class="s-res">${v.trim()}</span>`)
+                .replace(/✅|✓/g, '<span style="color:#00ff9d">$&</span>')
+                .replace(/❌/g, '<span style="color:#ff4444">$&</span>');
+            resEl.style.display = 'block';
+        }
+
+        function drawLawCanvas(key) {
+            const cvs = document.getElementById('lawCanvas');
+            if (!cvs) return;
+            const ctx = cvs.getContext('2d');
+            const W = cvs.offsetWidth || 600, H = 60;
+            cvs.width = W; cvs.height = H;
+            ctx.clearRect(0, 0, W, H);
+
+            if (key === 'framebuffer' || key === 'pixels') {
+                // mini pixel grid
+                const cols = 60, rows = 4;
+                const cw = W / cols, rh = H / rows;
+                const colors2 = ['#00d4ff', '#00ff9d', '#ff6b35', '#ffdd57', '#c678dd'];
+                for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+                    ctx.fillStyle = colors2[(r * cols + c) % 5] + (Math.random() > .6 ? 'cc' : '33');
+                    ctx.fillRect(c * cw + .5, r * rh + .5, cw - 1, rh - 1);
+                }
+            } else if (key === 'units') {
+                // bit → byte → KB → MB chain
+                const stages = ['bits', 'bytes', 'KB', 'MB'];
+                const sw = W / 4;
+                stages.forEach((s, i) => {
+                    const x = i * sw, alpha = 1 - (i * 0.2);
+                    ctx.fillStyle = `rgba(0,212,255,${alpha * 0.15})`;
+                    ctx.fillRect(x + 4, 8, sw - 8, H - 16);
+                    ctx.strokeStyle = `rgba(0,212,255,${alpha * 0.6})`;
+                    ctx.lineWidth = 1; ctx.setLineDash([]);
+                    ctx.strokeRect(x + 4, 8, sw - 8, H - 16);
+                    ctx.fillStyle = '#00d4ff';
+                    ctx.font = 'bold 11px Share Tech Mono';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(s, x + sw / 2, H / 2 + 4);
+                    if (i < 3) {
+                        ctx.fillStyle = '#ffdd57';
+                        ctx.font = '9px Share Tech Mono';
+                        const divs = ['÷8', '÷1024', '÷1024'];
+                        ctx.fillText(divs[i], x + sw - 2, H / 2 - 10);
+                    }
+                });
+            } else if (key === 'flicker') {
+                drawFlickerViz('lawCanvas');
+            } else if (key === 'aspect') {
+                drawAspectRatioViz('lawCanvas');
+            } else {
+                // generic wave
+                for (let x = 0; x < W; x++) {
+                    const y = H / 2 + Math.sin(x * 0.06) * 18 + Math.sin(x * 0.02) * 8;
+                    const alpha = 0.5 + Math.sin(x * 0.04) * 0.3;
+                    ctx.fillStyle = `rgba(0,212,255,${alpha * 0.4})`;
+                    ctx.fillRect(x, y, 1, H - y);
+                }
+                ctx.strokeStyle = 'rgba(0,212,255,0.8)';
+                ctx.lineWidth = 1.5; ctx.setLineDash([]);
+                ctx.beginPath();
+                for (let x = 0; x < W; x++) {
+                    const y = H / 2 + Math.sin(x * 0.06) * 18 + Math.sin(x * 0.02) * 8;
+                    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+        }
+
+    </script>
+</body>
+
+</html>
