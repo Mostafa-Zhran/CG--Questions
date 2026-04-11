@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HackQuiz — Ethical Hacking Quiz App</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&family=Orbitron:wght@400;700;900&display=swap"
+    rel="stylesheet">
+  <style>
+    /* ═══ DESIGN TOKENS — matches index.html / cs_pioneers.html ═══ */
+    :root {
+      --bg: #030810;
+      --bg2: #060f1e;
+      --panel: #0a1628;
+      --panel2: #0d1e35;
+      --border: #0d3a6e;
+      --glow: #00d4ff;
+      --glow2: #00ff9d;
+      --glow3: #ff6b35;
+      --amber: #ffdd57;
+      --red: #ff4444;
+      --purple: #c678dd;
+      --text: #c8e8ff;
+      --muted: #4a7a9b;
+
+      /* semantic aliases (keep JS references working) */
+      --blue-50: rgba(0, 212, 255, 0.08);
+      --blue-600: #00d4ff;
+      --blue-800: #00d4ff;
+      --green-50: rgba(0, 255, 157, 0.08);
+      --green-600: #00ff9d;
+      --green-800: #00ff9d;
+      --amber-50: rgba(255, 221, 87, 0.10);
+      --amber-600: #ffdd57;
+      --red-50: rgba(255, 68, 68, 0.10);
+      --red-600: #ff4444;
+      --red-800: #ff6666;
+      --purple-50: rgba(198, 120, 221, 0.10);
+      --purple-600: #c678dd;
+      --coral-50: rgba(255, 107, 53, 0.10);
+      --coral-600: #ff6b35;
+      --teal-50: rgba(0, 255, 157, 0.08);
+      --teal-600: #00ff9d;
+
+      --bg-primary: var(--panel);
+      --bg-secondary: var(--panel2);
+      --bg-tertiary: var(--bg2);
+      --text-primary: var(--text);
+      --text-secondary: var(--muted);
+      --border-hover: rgba(0, 212, 255, 0.5);
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Rajdhani', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── grid BG ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background-image:
+        linear-gradient(rgba(0, 212, 255, .03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 212, 255, .03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    /* ── stars ── */
+    #stars {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .star {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      border-radius: 50%;
+      background: #fff;
+      opacity: 0;
+      animation: twinkle var(--d, 3s) ease-in-out infinite;
+    }
+
+    @keyframes twinkle {
+
+      0%,
+      100% {
+        opacity: 0;
+        transform: scale(1)
+      }
+
+      50% {
+        opacity: var(--o, .5);
+        transform: scale(1.6)
+      }
+    }
+
+    /* ── layout ── */
+    .app {
+      position: relative;
+      z-index: 1;
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 1rem;
+      min-height: 100vh;
+    }
+
+    /* ── nav ── */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      background: var(--panel);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      margin-bottom: 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .nav::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--glow), var(--glow2), transparent);
+    }
+
+    .nav-brand {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--glow);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-shadow: 0 0 12px rgba(0, 212, 255, .6);
+    }
+
+    .nav-badge {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      background: rgba(0, 212, 255, .12);
+      color: var(--glow2);
+      border: 1px solid rgba(0, 255, 157, .4);
+      padding: 2px 10px;
+      border-radius: 20px;
+    }
+
+    .nav-stats {
+      display: flex;
+      gap: 14px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .nav-stat {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* ── screens ── */
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    /* ── hero ── */
+    .hero {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      text-align: center;
+      margin-bottom: 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--glow), var(--glow2), transparent);
+    }
+
+    .hero-icon {
+      width: 64px;
+      height: 64px;
+      background: rgba(0, 212, 255, .08);
+      border: 1px solid rgba(0, 212, 255, .3);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+      font-size: 28px;
+      box-shadow: 0 0 20px rgba(0, 212, 255, .15);
+    }
+
+    .hero h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--glow);
+      margin-bottom: 8px;
+      text-shadow: 0 0 20px rgba(0, 212, 255, .5);
+    }
+
+    .hero p {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+    }
+
+    /* ── stat cards ── */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 1rem;
+    }
+
+    .stat-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1rem 1.25rem;
+      transition: border-color .2s, box-shadow .2s;
+    }
+
+    .stat-card:hover {
+      border-color: rgba(0, 212, 255, .4);
+      box-shadow: 0 0 16px rgba(0, 212, 255, .07);
+    }
+
+    .stat-card .label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .stat-card .value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .stat-card .sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .stat-card.accent-blue {
+      border-left: 3px solid var(--glow);
+    }
+
+    .stat-card.accent-green {
+      border-left: 3px solid var(--glow2);
+    }
+
+    .stat-card.accent-amber {
+      border-left: 3px solid var(--amber);
+    }
+
+    .stat-card.accent-purple {
+      border-left: 3px solid var(--purple);
+    }
+
+    /* ── buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border-radius: var(--radius-md);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      transition: all 0.15s;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      border-color: var(--glow);
+      color: var(--glow);
+      box-shadow: 0 0 12px rgba(0, 212, 255, .15);
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-primary {
+      background: rgba(0, 212, 255, .12);
+      color: var(--glow);
+      border: 1px solid var(--glow);
+      font-size: 14px;
+      padding: 12px 28px;
+      text-shadow: 0 0 8px rgba(0, 212, 255, .5);
+      box-shadow: 0 0 20px rgba(0, 212, 255, .1);
+    }
+
+    .btn-primary:hover {
+      background: rgba(0, 212, 255, .2);
+      box-shadow: 0 0 30px rgba(0, 212, 255, .25);
+    }
+
+    .btn-full {
+      width: 100%;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* ── mode cards ── */
+    .mode-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: 1rem;
+    }
+
+    .mode-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+
+    .mode-card:hover {
+      border-color: var(--glow);
+      background: rgba(0, 212, 255, .06);
+      box-shadow: 0 0 16px rgba(0, 212, 255, .1);
+    }
+
+    .mode-card.selected {
+      border: 2px solid var(--glow);
+      background: rgba(0, 212, 255, .1);
+      box-shadow: 0 0 20px rgba(0, 212, 255, .15);
+    }
+
+    .mode-card .mode-icon {
+      font-size: 24px;
+      margin-bottom: 6px;
+    }
+
+    .mode-card .mode-name {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .mode-card .mode-desc {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ── quiz header ── */
+    .quiz-header {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .quiz-header::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--glow), transparent);
+    }
+
+    .quiz-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+    }
+
+    .quiz-meta .q-label {
+      color: var(--muted);
+    }
+
+    .quiz-meta .q-score {
+      color: var(--glow);
+      font-weight: bold;
+    }
+
+    .progress-bar {
+      height: 4px;
+      background: var(--panel2);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--glow), var(--glow2));
+      border-radius: 2px;
+      transition: width 0.4s ease;
+      box-shadow: 0 0 8px var(--glow);
+    }
+
+    .timer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+    }
+
+    .timer {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .timer.urgent {
+      color: var(--red);
+      text-shadow: 0 0 8px rgba(255, 68, 68, .6);
+    }
+
+    .timer.ok {
+      color: var(--glow2);
+    }
+
+    .streak-pill {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      background: rgba(255, 221, 87, .08);
+      color: var(--amber);
+      border: 1px solid rgba(255, 221, 87, .4);
+      padding: 3px 12px;
+      border-radius: 20px;
+    }
+
+    /* ── question card ── */
+    .question-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .question-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--glow), var(--glow2), transparent);
+    }
+
+    .question-card.shake {
+      animation: shake 0.4s ease;
+    }
+
+    .question-card.correct-flash {
+      border-color: var(--glow2);
+      box-shadow: 0 0 24px rgba(0, 255, 157, .2);
+    }
+
+    @keyframes shake {
+
+      0%,
+      100% {
+        transform: translateX(0)
+      }
+
+      20%,
+      60% {
+        transform: translateX(-6px)
+      }
+
+      40%,
+      80% {
+        transform: translateX(6px)
+      }
+    }
+
+    .q-module {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--glow);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .q-text {
+      font-size: 16px;
+      color: var(--text);
+      line-height: 1.6;
+      margin-bottom: 1.25rem;
+    }
+
+    .options-grid {
+      display: grid;
+      gap: 8px;
+    }
+
+    .option-btn {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--panel2);
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: left;
+      width: 100%;
+      font-family: 'Rajdhani', sans-serif;
+    }
+
+    .option-btn:hover:not(.disabled) {
+      border-color: var(--glow);
+      background: rgba(0, 212, 255, .06);
+      box-shadow: 0 0 12px rgba(0, 212, 255, .1);
+    }
+
+    .option-btn.selected-correct {
+      border-color: var(--glow2);
+      background: rgba(0, 255, 157, .08);
+      box-shadow: 0 0 16px rgba(0, 255, 157, .15);
+    }
+
+    .option-btn.selected-wrong {
+      border-color: var(--red);
+      background: rgba(255, 68, 68, .08);
+    }
+
+    .option-btn.reveal-correct {
+      border-color: var(--glow2);
+      background: rgba(0, 255, 157, .06);
+    }
+
+    .option-btn.disabled {
+      cursor: default;
+    }
+
+    .opt-key {
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .option-btn.selected-correct .opt-key {
+      background: var(--glow2);
+      color: #000;
+      border-color: var(--glow2);
+    }
+
+    .option-btn.selected-wrong .opt-key {
+      background: var(--red);
+      color: #fff;
+      border-color: var(--red);
+    }
+
+    .option-btn.reveal-correct .opt-key {
+      background: var(--glow2);
+      color: #000;
+      border-color: var(--glow2);
+    }
+
+    .opt-text {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    /* ── feedback ── */
+    .feedback-bar {
+      padding: 10px 16px;
+      border-radius: var(--radius-md);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 1px;
+      margin-bottom: 1rem;
+      display: none;
+    }
+
+    .feedback-bar.show {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .feedback-bar.correct-fb {
+      background: rgba(0, 255, 157, .08);
+      color: var(--glow2);
+      border: 1px solid rgba(0, 255, 157, .4);
+    }
+
+    .feedback-bar.wrong-fb {
+      background: rgba(255, 68, 68, .08);
+      color: var(--red);
+      border: 1px solid rgba(255, 68, 68, .4);
+    }
+
+    /* ── results ── */
+    .results-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .results-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--glow), var(--glow2), transparent);
+    }
+
+    .results-score-ring {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+      border: 3px solid var(--glow);
+      box-shadow: 0 0 30px rgba(0, 212, 255, .3), inset 0 0 20px rgba(0, 212, 255, .08);
+    }
+
+    .results-pct {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 26px;
+      font-weight: 900;
+      color: var(--glow);
+      text-shadow: 0 0 16px rgba(0, 212, 255, .7);
+    }
+
+    .results-label {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .results-grade {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .grade-A {
+      color: var(--glow2);
+      text-shadow: 0 0 12px rgba(0, 255, 157, .5);
+    }
+
+    .grade-B {
+      color: var(--glow);
+      text-shadow: 0 0 12px rgba(0, 212, 255, .5);
+    }
+
+    .grade-C {
+      color: var(--amber);
+    }
+
+    .grade-D {
+      color: var(--red);
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 1rem 0;
+    }
+
+    .result-stat {
+      text-align: center;
+    }
+
+    .result-stat .num {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .result-stat .lbl {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* ── badges ── */
+    .badges-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin: 1rem 0;
+    }
+
+    .badge-pill {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+    }
+
+    .badge-gold {
+      background: rgba(255, 221, 87, .1);
+      color: var(--amber);
+      border: 1px solid rgba(255, 221, 87, .4);
+    }
+
+    .badge-blue {
+      background: rgba(0, 212, 255, .1);
+      color: var(--glow);
+      border: 1px solid rgba(0, 212, 255, .4);
+    }
+
+    .badge-green {
+      background: rgba(0, 255, 157, .1);
+      color: var(--glow2);
+      border: 1px solid rgba(0, 255, 157, .4);
+    }
+
+    .badge-purple {
+      background: rgba(198, 120, 221, .1);
+      color: var(--purple);
+      border: 1px solid rgba(198, 120, 221, .4);
+    }
+
+    /* ── review ── */
+    .review-item {
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1rem 1.25rem;
+      margin-bottom: 8px;
+    }
+
+    .review-item.correct-r {
+      border-left: 3px solid var(--glow2);
+    }
+
+    .review-item.wrong-r {
+      border-left: 3px solid var(--red);
+    }
+
+    .review-q {
+      font-size: 13px;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .review-ans {
+      font-size: 12px;
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    .review-ans.ok {
+      color: var(--glow2);
+    }
+
+    .review-ans.bad {
+      color: var(--red);
+    }
+
+    .review-correct-ans {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* ── leaderboard ── */
+    .lb-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      margin-bottom: 6px;
+      transition: border-color .2s;
+    }
+
+    .lb-row:hover {
+      border-color: rgba(0, 212, 255, .3);
+    }
+
+    .lb-rank {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .rank-1 {
+      background: rgba(255, 221, 87, .1);
+      color: var(--amber);
+      border: 1px solid rgba(255, 221, 87, .5);
+    }
+
+    .rank-2 {
+      background: rgba(0, 212, 255, .1);
+      color: var(--glow);
+      border: 1px solid rgba(0, 212, 255, .4);
+    }
+
+    .rank-3 {
+      background: rgba(255, 107, 53, .1);
+      color: var(--glow3);
+      border: 1px solid rgba(255, 107, 53, .4);
+    }
+
+    .rank-other {
+      background: var(--panel2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .lb-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+
+    .lb-name {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .lb-details {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    .lb-score {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--glow);
+    }
+
+    .lb-you {
+      border: 1px solid var(--glow);
+      background: rgba(0, 212, 255, .06);
+      box-shadow: 0 0 16px rgba(0, 212, 255, .1);
+    }
+
+    /* ── tabs ── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 4px;
+      border-radius: var(--radius-md);
+      margin-bottom: 1rem;
+    }
+
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 7px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--muted);
+      transition: all 0.15s;
+      border: none;
+      background: none;
+      text-transform: uppercase;
+    }
+
+    .tab.active {
+      background: rgba(0, 212, 255, .12);
+      color: var(--glow);
+      border: 1px solid rgba(0, 212, 255, .4);
+      text-shadow: 0 0 8px rgba(0, 212, 255, .5);
+    }
+
+    .tab:hover:not(.active) {
+      color: var(--text);
+    }
+
+    /* ── section labels ── */
+    .section-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+    }
+
+    .section-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    /* ── confetti ── */
+    .confetti-piece {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      animation: fall 1s ease-out forwards;
+      pointer-events: none;
+    }
+
+    @keyframes fall {
+      0% {
+        transform: translateY(-20px) rotate(0deg);
+        opacity: 1
+      }
+
+      100% {
+        transform: translateY(200px) rotate(720deg);
+        opacity: 0
+      }
+    }
+
+    /* ── difficulty tags ── */
+    .difficulty-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      margin-left: 8px;
+    }
+
+    .diff-easy {
+      background: rgba(0, 255, 157, .1);
+      color: var(--glow2);
+      border: 1px solid rgba(0, 255, 157, .3);
+    }
+
+    .diff-medium {
+      background: rgba(255, 221, 87, .1);
+      color: var(--amber);
+      border: 1px solid rgba(255, 221, 87, .3);
+    }
+
+    .diff-hard {
+      background: rgba(255, 68, 68, .1);
+      color: var(--red);
+      border: 1px solid rgba(255, 68, 68, .3);
+    }
+
+    /* ── XP bar ── */
+    .xp-bar-wrap {
+      margin-top: 8px;
+    }
+
+    .xp-label {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .xp-bar {
+      height: 4px;
+      background: var(--panel2);
+      border-radius: 2px;
+    }
+
+    .xp-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--purple), var(--glow));
+      border-radius: 2px;
+      transition: width 0.6s ease;
+      box-shadow: 0 0 6px rgba(198, 120, 221, .5);
+    }
+
+    /* ── daily card ── */
+    .daily-card {
+      background: rgba(0, 212, 255, .05);
+      border: 1px solid rgba(0, 212, 255, .3);
+      border-radius: var(--radius-lg);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 0 20px rgba(0, 212, 255, .06);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .daily-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--glow), transparent);
+    }
+
+    .daily-card .title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--glow);
+      margin-bottom: 4px;
+    }
+
+    .daily-card .sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* ── generic panels (inline styles on divs) ── */
+    [style*="background:var(--bg-primary)"],
+    [style*="background: var(--bg-primary)"] {
+      background: var(--panel) !important;
+    }
+
+    /* ── back btn ── */
+    .back-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 1px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 0;
+      margin-bottom: 10px;
+      transition: color .15s;
+    }
+
+    .back-btn:hover {
+      color: var(--red);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--glow);
+    }
+
+    /* ── scrollbar ── */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg2);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    @media (max-width: 500px) {
+      .nav-stats {
+        display: none;
+      }
+
+      .mode-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="stars"></div>
+  <div class="app">
+    <nav class="nav">
+      <div class="nav-brand">
+        <span style="font-size:18px;">🛡️</span> HackQuiz <span class="nav-badge">Ethical Hacking</span>
+      </div>
+      <div class="nav-stats">
+        <span class="nav-stat">⭐ <span id="nav-score">0</span> pts</span>
+        <span class="nav-stat">🔥 <span id="nav-streak">0</span> streak</span>
+        <span class="nav-stat">🏅 Lv <span id="nav-level">1</span></span>
+      </div>
+    </nav>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showPage('home')">Home</button>
+      <button class="tab" onclick="showPage('quiz-setup')">Quiz</button>
+      <button class="tab" onclick="showPage('leaderboard')">Leaders</button>
+      <button class="tab" onclick="showPage('profile')">Profile</button>
+    </div>
+
+    <!-- HOME -->
+    <div id="page-home" class="screen active">
+      <div class="daily-card">
+        <div>
+          <div class="title">Daily Challenge 🎯</div>
+          <div class="sub">10 questions · 60s timer · 2x XP today!</div>
+          <div style="margin-top:8px;">
+            <button class="btn btn-primary" style="padding:8px 18px;font-size:13px;"
+              onclick="startDailyChallenge()">Start Challenge</button>
+          </div>
+        </div>
+        <div style="font-size:32px;">🔥</div>
+      </div>
+      <div class="grid-2">
+        <div class="stat-card accent-blue">
+          <div class="label">Total Score</div>
+          <div class="value" id="home-score">0</div>
+          <div class="sub">lifetime points</div>
+        </div>
+        <div class="stat-card accent-green">
+          <div class="label">Best Streak</div>
+          <div class="value" id="home-streak">0</div>
+          <div class="sub">consecutive correct</div>
+        </div>
+        <div class="stat-card accent-amber">
+          <div class="label">Accuracy</div>
+          <div class="value" id="home-accuracy">—</div>
+          <div class="sub">average score</div>
+        </div>
+        <div class="stat-card accent-purple">
+          <div class="label">Quizzes Done</div>
+          <div class="value" id="home-quizzes">0</div>
+          <div class="sub">total attempts</div>
+        </div>
+      </div>
+      <div
+        style="background:var(--bg-primary);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1rem;">
+        <div class="section-title">Your level</div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div
+            style="width:48px;height:48px;border-radius:12px;background:var(--purple-50);border:0.5px solid var(--purple-600);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">
+            🎓</div>
+          <div style="flex:1;">
+            <div style="font-weight:500;font-size:14px;" id="level-name">Novice Hacker</div>
+            <div class="xp-bar-wrap">
+              <div class="xp-label"><span>XP: <span id="xp-cur">0</span></span><span id="xp-next">100</span></div>
+              <div class="xp-bar">
+                <div class="xp-fill" id="xp-bar-fill" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUIZ SETUP -->
+    <div id="page-quiz-setup" class="screen">
+      <p class="section-title">Choose a mode</p>
+      <div class="mode-grid">
+        <div class="mode-card" id="mode-timed" onclick="selectMode('timed')">
+          <div class="mode-icon">⏱️</div>
+          <div class="mode-name">Speed Run</div>
+          <div class="mode-desc">Timed · 15-20s per Q</div>
+        </div>
+        <div class="mode-card" id="mode-module1" onclick="selectMode('module1')">
+          <div class="mode-icon">🔧</div>
+          <div class="mode-name">Module 1</div>
+          <div class="mode-desc">Ethical hacking basics</div>
+        </div>
+        <div class="mode-card" id="mode-module2" onclick="selectMode('module2')">
+          <div class="mode-icon">⚖️</div>
+          <div class="mode-name">Module 2</div>
+          <div class="mode-desc">Laws &amp; compliance · 24 Q</div>
+        </div>
+        <div class="mode-card selected" id="mode-standard" onclick="selectMode('standard')">
+          <div class="mode-icon">📚</div>
+          <div class="mode-name">Standard</div>
+          <div class="mode-desc">Random mix · custom count</div>
+        </div>
+      </div>
+      <div class="mode-card" id="mode-all" onclick="selectMode('all')"
+        style="display:flex;align-items:center;gap:14px;text-align:left;padding:14px 18px;margin-bottom:1rem;">
+        <div style="font-size:28px;flex-shrink:0;">🎓</div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:500;color:var(--text-primary);">All Modules — Complete Course</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">All 48 questions from Module 1 +
+            Module 2 in sequence · Full exam simulation</div>
+        </div>
+        <div
+          style="background:var(--blue-50);color:var(--blue-800);font-size:12px;font-weight:500;padding:4px 10px;border-radius:20px;border:0.5px solid var(--blue-600);white-space:nowrap;">
+          48 Q</div>
+      </div>
+      <div id="q-count-section"
+        style="background:var(--bg-primary);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1rem;">
+        <div class="section-title">Number of questions</div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <input type="range" id="q-count" min="5" max="24" value="10" step="1"
+            oninput="document.getElementById('q-count-out').textContent=this.value">
+          <span id="q-count-out" style="font-size:15px;font-weight:500;min-width:28px;text-align:right;">10</span>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" style="font-size:16px;padding:14px;" onclick="startQuiz()">Start Quiz
+        →</button>
+    </div>
+
+    <!-- QUIZ -->
+    <div id="page-quiz" class="screen">
+      <div class="quiz-header">
+        <div class="quiz-meta">
+          <span class="q-label">Question <span id="q-current">1</span> of <span id="q-total">10</span></span>
+          <span class="q-score">⭐ <span id="q-pts">0</span> pts</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="q-progress" style="width:0%"></div>
+        </div>
+        <div class="timer-row">
+          <div id="timer-display" class="timer ok">⏱ <span id="timer-val">—</span></div>
+          <div class="streak-pill" id="streak-display">🔥 0 streak</div>
+        </div>
+      </div>
+      <div class="question-card" id="question-card">
+        <div class="q-module" id="q-module-tag">Module 1</div>
+        <div class="q-text" id="q-text">Question text</div>
+        <div class="options-grid" id="options-container"></div>
+      </div>
+      <div class="feedback-bar" id="feedback-bar"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <button class="back-btn" onclick="confirmQuit()">✕ Quit quiz</button>
+        <button class="btn btn-primary" id="next-btn" style="display:none;" onclick="nextQuestion()">Next →</button>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="page-results" class="screen">
+      <div class="results-card" id="results-confetti">
+        <div class="results-score-ring">
+          <div class="results-pct" id="res-pct">0%</div>
+          <div class="results-label">score</div>
+        </div>
+        <div class="results-grade" id="res-grade">—</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-bottom:1rem;" id="res-msg"></div>
+        <div class="results-grid">
+          <div class="result-stat">
+            <div class="num" id="res-correct" style="color:var(--green-600);">0</div>
+            <div class="lbl">Correct</div>
+          </div>
+          <div class="result-stat">
+            <div class="num" id="res-wrong" style="color:var(--red-600);">0</div>
+            <div class="lbl">Wrong</div>
+          </div>
+          <div class="result-stat">
+            <div class="num" id="res-pts" style="color:var(--blue-800);">0</div>
+            <div class="lbl">Points</div>
+          </div>
+        </div>
+        <div class="badges-row" id="badges-row"></div>
+      </div>
+      <div
+        style="background:var(--bg-primary);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1rem;">
+        <div class="section-title">Review answers</div>
+        <div id="review-container"></div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="startQuiz()">Retry quiz</button>
+        <button class="btn" onclick="showPage('home')">Home</button>
+        <button class="btn" onclick="showPage('leaderboard')">Leaderboard</button>
+      </div>
+    </div>
+
+    <!-- LEADERBOARD -->
+    <div id="page-leaderboard" class="screen">
+      <div class="section-title">Global Leaderboard</div>
+      <div class="section-sub">Updated after each quiz</div>
+      <div id="lb-container"></div>
+    </div>
+
+    <!-- PROFILE -->
+    <div id="page-profile" class="screen">
+      <div
+        style="background:var(--bg-primary);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1rem;display:flex;align-items:center;gap:16px;">
+        <div
+          style="width:60px;height:60px;border-radius:50%;background:var(--blue-50);border:2px solid var(--blue-600);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;">
+          👤</div>
+        <div>
+          <div style="font-size:16px;font-weight:500;">Cyber Learner</div>
+          <div style="font-size:12px;color:var(--text-secondary);" id="profile-title">Novice Hacker · Level 1</div>
+          <div class="xp-bar-wrap" style="min-width:200px;">
+            <div class="xp-label"><span>XP: <span id="p-xp">0</span></span><span id="p-xp-next">100</span></div>
+            <div class="xp-bar">
+              <div class="xp-fill" id="p-xp-fill" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:1rem;">
+        <div class="stat-card accent-blue">
+          <div class="label">Total XP</div>
+          <div class="value" id="p-total-xp">0</div>
+        </div>
+        <div class="stat-card accent-green">
+          <div class="label">Best Score</div>
+          <div class="value" id="p-best">—</div>
+        </div>
+        <div class="stat-card accent-amber">
+          <div class="label">Max Streak</div>
+          <div class="value" id="p-max-streak">0</div>
+        </div>
+        <div class="stat-card accent-purple">
+          <div class="label">Total Quizzes</div>
+          <div class="value" id="p-quizzes">0</div>
+        </div>
+      </div>
+      <div
+        style="background:var(--bg-primary);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1rem;">
+        <div class="section-title">Achievements</div>
+        <div class="badges-row" id="profile-badges" style="justify-content:flex-start;"></div>
+      </div>
+      <button class="btn" style="color:var(--red-600);border-color:var(--red-600);" onclick="resetProgress()">Reset
+        progress</button>
+    </div>
+  </div>
+
+  <script>
+    const ALL_QUESTIONS = [
+      { id: 1, mod: 1, text: "Which statement best describes the term ethical hacker?", options: ["A person who uses different tools than nonethical hackers to find vulnerabilities", "A person that is financially motivated to find vulnerabilities and exploit targets", "A person that is looking to make a point or to promote what they believe", "A person who mimics an attacker to evaluate the security posture of a network"], answer: 3, difficulty: "easy" },
+      { id: 2, mod: 1, text: "Which threat actor term describes a well-funded and motivated group that will use the latest attack techniques for financial gain?", options: ["Hacktivist", "State-sponsored attacker", "Organized crime", "Insider threat"], answer: 2, difficulty: "easy" },
+      { id: 3, mod: 1, text: "Which type of threat actor uses cybercrime to steal sensitive data and reveal it publicly to embarrass a target?", options: ["Organized crime", "Hacktivist", "Insider threat", "State-sponsored attacker"], answer: 1, difficulty: "medium" },
+      { id: 4, mod: 1, text: "What is a state-sponsored attack?", options: ["An attack perpetrated by a well-funded motivated group for financial gain", "An attack perpetrated by governments worldwide to disrupt or steal information from other nations", "An attack perpetrated by disgruntled employees inside an organization", "An attack to steal sensitive data and reveal it publicly to embarrass a target"], answer: 1, difficulty: "medium" },
+      { id: 5, mod: 1, text: "What is an insider threat attack?", options: ["An attack by a well-funded group using the latest techniques for financial gain", "An attack by governments to disrupt or steal information from other nations", "An attack perpetrated by disgruntled employees inside an organization", "An attack to steal sensitive data and reveal it publicly to embarrass a target"], answer: 2, difficulty: "easy" },
+      { id: 6, mod: 1, text: "What kind of security weakness is evaluated by application-based penetration tests?", options: ["Firewall security", "Logic flaws", "Wireless deployment", "Data integrity between a client and a cloud provider"], answer: 1, difficulty: "medium" },
+      { id: 7, mod: 1, text: "What two resources are evaluated by a network infrastructure penetration test? (Choose the best single answer covering both)", options: ["AAA servers and IPSs", "Web servers and IPSs", "AAA servers and web servers", "IPSs and back-end databases"], answer: 0, difficulty: "hard" },
+      { id: 8, mod: 1, text: "When conducting an application-based penetration test on a web application, the assessment should also include testing access to which resources?", options: ["AAA servers", "Cloud services", "Switches, routers, and firewalls", "Back-end databases"], answer: 3, difficulty: "medium" },
+      { id: 9, mod: 1, text: "What is the purpose of bug bounty programs used by companies?", options: ["Reward security professionals for finding vulnerabilities in the systems of the company", "Reward security professionals for discovering malicious activities by attackers", "Reward security professionals for fixing vulnerabilities", "Reward security professionals for breaking into a corporate facility"], answer: 0, difficulty: "easy" },
+      { id: 10, mod: 1, text: "What characterizes a partially known environment penetration test?", options: ["The tester must test the electrical grid supporting the infrastructure", "The tester is provided with a list of domain names and IP addresses in scope", "The test is a hybrid approach between unknown and known environment tests", "The tester should not have prior knowledge of the organization"], answer: 2, difficulty: "medium" },
+      { id: 11, mod: 1, text: "What characterizes a known environment penetration test?", options: ["The test is somewhat of a hybrid approach between unknown and known environment tests", "The tester could be provided with network diagrams, IP addresses, configurations, and user credentials", "The tester should not have prior knowledge of the organization and infrastructure", "The tester may be provided only the domain names and IP addresses in scope"], answer: 1, difficulty: "medium" },
+      { id: 12, mod: 1, text: "Which type of penetration test would only provide the tester with limited information such as domain names and IP addresses?", options: ["Known-environment test", "Partially known environment test", "Unknown-environment test", "OWASP Web Security Testing Guide"], answer: 2, difficulty: "easy" },
+      { id: 13, mod: 1, text: "Which three options are phases in the Penetration Testing Execution Standard (PTES)? (Select the best answer)", options: ["Threat modeling, Exploitation, Reporting", "Threat modeling, Enumerating further, Network mapping", "Penetration, Reporting, Vulnerability identification", "Reporting, Network mapping, Exploitation"], answer: 0, difficulty: "hard" },
+      { id: 14, mod: 1, text: "Which two options are phases in the Information Systems Security Assessment Framework (ISSAF)? (Select best answer)", options: ["Pre-engagement interactions and Maintaining access", "Maintaining access and Reporting", "Maintaining access and Vulnerability identification", "Pre-engagement interactions and Vulnerability identification"], answer: 2, difficulty: "hard" },
+      { id: 15, mod: 1, text: "Which two options are phases in the Open Source Security Testing Methodology Manual (OSSTMM)? (Select best answer)", options: ["Vulnerability Analysis and Maintaining Access", "Work Flow and Trust Analysis", "Maintaining Access and Network Mapping", "Trust Analysis and Vulnerability Analysis"], answer: 1, difficulty: "hard" },
+      { id: 16, mod: 1, text: "Which penetration testing methodology is a comprehensive guide focused on web application testing?", options: ["MITRE ATT&CK", "OWASP WSTG", "NIST SP 800-115", "OSSTMM"], answer: 1, difficulty: "medium" },
+      { id: 17, mod: 1, text: "Which option is a Linux distribution that includes penetration testing tools and resources?", options: ["OWASP", "PTES", "SET", "BlackArch"], answer: 3, difficulty: "easy" },
+      { id: 18, mod: 1, text: "Which option is a Linux distribution URL that provides a convenient learning environment about pen testing tools and methodologies?", options: ["vmware.com", "attack.mitre.org", "parrotsec.org", "virtualbox.org"], answer: 2, difficulty: "medium" },
+      { id: 19, mod: 1, text: "What does the 'Health Monitoring' requirement mean when setting up a penetration test lab environment?", options: ["The tester needs to ensure a lack of resources is not causing false results", "The tester needs to be able to determine the causes when something crashes", "The tester needs to ensure controlled access to and from the lab environment", "The tester validates a finding by running the same test with a different tool"], answer: 1, difficulty: "hard" },
+      { id: 20, mod: 1, text: "Which tool would be useful when performing a network infrastructure penetration test?", options: ["Vulnerability scanning tool", "Bypassing firewalls and IPSs tool", "Interception proxies tool", "Mobile application testing tool"], answer: 1, difficulty: "medium" },
+      { id: 21, mod: 1, text: "Which tool should be used to perform an application-based penetration test?", options: ["Sniffing traffic tool", "Bypassing firewalls and IPSs tool", "Interception proxies tool", "Cracking wireless encryption tool"], answer: 2, difficulty: "medium" },
+      { id: 22, mod: 1, text: "Which tools should be used to perform a wireless infrastructure penetration test?", options: ["Web vulnerability detection tools", "Traffic manipulation tools", "Proxy interception tools", "De-authorizing network devices tools"], answer: 3, difficulty: "medium" },
+      { id: 23, mod: 1, text: "Which tools should be used for testing the server and client platforms in an environment?", options: ["Cracking wireless encryption tools", "Vulnerability scanning tools", "Interception proxies tools", "De-authorizing network devices tools"], answer: 1, difficulty: "medium" },
+      { id: 24, mod: 1, text: "Sometimes a tester cannot virtualize a system. What action should be taken if a system cannot be tested in a virtualized environment?", options: ["A full backup of the system", "Rebuild the system after any test is performed", "Adopt penetration test tools that will certainly not damage the system", "A complete report with recommended repairs"], answer: 0, difficulty: "hard" },
+      { id: 25, mod: 2, text: "A contractor is hired to review and perform cybersecurity vulnerability assessments for a local health clinic facility. Which U.S. government regulation must the contractor understand before the contractor can start?", options: ["GDPR", "GLBA", "HIPAA", "FedRAMP"], answer: 2, difficulty: "easy" },
+      { id: 26, mod: 2, text: "An Internal Revenue Service office in New York is considering moving some services to a cloud computing platform. Which U.S. government regulation must the office follow in the process?", options: ["GDPR", "FFIEC", "HIPAA", "FedRAMP"], answer: 3, difficulty: "medium" },
+      { id: 27, mod: 2, text: "A US university in California plans to offer online courses to students in partner universities in France and Germany. Which regulation should the university follow when those courses are offered?", options: ["GDPR", "HIPAA", "FERPA", "FedRAMP"], answer: 0, difficulty: "medium" },
+      { id: 28, mod: 2, text: "Which U.S. government agency is responsible for enforcing the Privacy of Consumer Financial Information Rule of the Gramm-Leach-Bliley Act (GLB Act)?", options: ["Federal Trade Commission (FTC)", "Securities and Exchange Commission (SEC)", "Commodity Futures Trading Commission (CFTC)", "Federal Deposit Insurance Corporation (FDIC)"], answer: 0, difficulty: "hard" },
+      { id: 29, mod: 2, text: "In the healthcare sector, which term defines an entity that processes nonstandard health information it receives from another entity into a standard format?", options: ["health plan", "healthcare provider", "business associates", "healthcare clearinghouse"], answer: 3, difficulty: "medium" },
+      { id: 30, mod: 2, text: "In the healthcare sector, which term is used to define an entity that provides payment for medical services?", options: ["health plan", "healthcare provider", "business associates", "healthcare clearinghouse"], answer: 0, difficulty: "medium" },
+      { id: 31, mod: 2, text: "In e-commerce, what determines the application of the Payment Card Industry Data Security Standard (PCI DSS) requirements?", options: ["merchant", "payment brand", "primary account number", "approved scanning vendor"], answer: 2, difficulty: "hard" },
+      { id: 32, mod: 2, text: "What are two examples of sensitive authentication data associated with a payment card that requires compliance with the Payment Card Industry Data Security Standard (PCI DSS)? (Choose two.)", options: ["expiration date and cardholder name", "CAV2/CVC2/CVV2/CID and primary account number", "CAV2/CVC2/CVV2/CID and full magnetic strip data or equivalent data on a chip", "primary account number and expiration date"], answer: 2, difficulty: "hard" },
+      { id: 33, mod: 2, text: "An employee of a cybersecurity consulting firm in the U.S. is assigned to help assess the system and operation vulnerabilities of several financial institutions in Europe. The task includes penetration tests for compliance. What is a key element the employee must have before starting the assignment?", options: ["state-of-the-art penetration testing tools", "valid user credentials to perform tests at each client institution", "detailed network diagrams and asset inventories from each client institution", "documentation of permission for performing the tests from the client institutions"], answer: 3, difficulty: "medium" },
+      { id: 34, mod: 2, text: "A company hires a cybersecurity professional to perform penetration tests to assess government regulation compliance. Which legal document should be provided to the cybersecurity professional that specifies the expectations and constraints, including quality of work, timelines, and cost?", options: ["statement of work (SOW)", "service-level agreement (SLA)", "non-disclosure agreement (NDA)", "master service agreement (MSA)"], answer: 1, difficulty: "hard" },
+      { id: 35, mod: 2, text: "A company hires a cybersecurity professional to perform penetration testing to assess government regulation compliance. Which document will be provided to the cybersecurity professional that specifies a detailed and descriptive list of all the deliverables, including the scope of the project, the timeline and report delivery schedule, the location of the work, and the payment schedule?", options: ["statement of work (SOW)", "service-level agreement (SLA)", "master service agreement (MSA)", "non-disclosure agreement (NDA)"], answer: 0, difficulty: "medium" },
+      { id: 36, mod: 2, text: "A company hires a cybersecurity consultant to perform penetration testing to assess government regulation compliance. The company wants the consultant to disclose information to them and no one else. Which type of NDA agreement should be presented to the consultant?", options: ["mutual NDA", "bilateral NDA", "unilateral NDA", "multilateral NDA"], answer: 2, difficulty: "medium" },
+      { id: 37, mod: 2, text: "A company hires a cybersecurity consultant to perform penetration testing to assess government regulation compliance. Which document must the consultant receive that specifies the agreement between the consultant and the company for the penetration testing engagement?", options: ["contract", "disclaimers", "statement of work", "non-disclosure agreement"], answer: 0, difficulty: "easy" },
+      { id: 38, mod: 2, text: "A company hires a cybersecurity consultant to perform penetration testing to assess government regulation compliance. The consultant is preparing the final report after the penetration testing is completed. In which section of the report should the consultant cover the limitation of the work performed, such as the only dates when the testing is performed and that the findings mentioned in the report do not guarantee that all vulnerabilities are covered?", options: ["disclaimers", "scope of work", "findings and analysis", "non-disclosure statement"], answer: 0, difficulty: "medium" },
+      { id: 39, mod: 2, text: "A company hires a cybersecurity consultant to perform penetration tests and review the rules of engagement documents. What are three examples of typical elements in the rules of engagement document? (Choose three.)", options: ["testing timeline, payment schedule, location of testing", "testing timeline, location of testing, preferred method of communication", "location of testing, non-disclosure agreement, unknown-environment testing condition", "payment schedule, non-disclosure agreement, testing timeline"], answer: 1, difficulty: "hard" },
+      { id: 40, mod: 2, text: "A company hires a cybersecurity consultant to perform penetration tests and review the rules of engagement documents. The consultant notices that one element specifies that the tests should be performed toward only web applications on websites www1.company.com and www2.company.com, with no social engineering attacks and no cross-site scripting attacks. Which element in the document is used for the specification?", options: ["location of testing", "types of allowed or disallowed tests", "IP addresses or networks from which testing will originate", "the security controls that could potentially detect or prevent testing"], answer: 1, difficulty: "medium" },
+      { id: 41, mod: 2, text: "A company hires a cybersecurity consultant to assess applications using different APIs. Which document should the company provide to the consultant about an XML-based language used to document a web service's functionality?", options: ["GraphQL documentation", "Swagger (OpenAPI) documentation", "Web Services Description Language (WSDL) document", "Web Application Description Language (WADL) document"], answer: 2, difficulty: "hard" },
+      { id: 42, mod: 2, text: "A company hires a cybersecurity consultant to assess applications using different APIs. Which document should the company provide to the consultant about a query language for APIs and a language for executing queries at runtime?", options: ["GraphQL documentation", "Swagger (OpenAPI) documentation", "Web Services Description Language (WSDL) document", "Web Application Description Language (WADL) document"], answer: 0, difficulty: "hard" },
+      { id: 43, mod: 2, text: "A company hires a cybersecurity consultant to assess vulnerability on crucial web application devices such as web and database servers. Which document should the company provide to help the consultant document and define what systems are in the testing?", options: ["examples of application requests", "source codes of the applications", "system and network architectural diagram", "software development kit (SDK) for specific applications"], answer: 2, difficulty: "medium" },
+      { id: 44, mod: 2, text: "A company hires a cybersecurity consultant to perform penetration tests. What can cause scope creep of the engagement?", options: ["lack of up-to-date testing tools", "lack of system and network architectural diagrams", "poor formatted request for proposal (RFP) by the company", "ineffective identification of what technical and nontechnical elements will be required for the penetration test"], answer: 3, difficulty: "medium" },
+      { id: 45, mod: 2, text: "A company hires a cybersecurity consultant to perform penetration tests. What should be the consultant's first step in validating the engagement scope?", options: ["Confirm the contents of the request for proposal (RFP).", "Request user credentials in accessing targeted systems.", "Question the company contact person and review contracts.", "Ensure that systems and network architectural diagrams are accurate."], answer: 2, difficulty: "medium" },
+      { id: 46, mod: 2, text: "A company hires a cybersecurity consultant to perform penetration tests. The consultant is working with the company to set up communication procedures. Which two protocols should be considered for exchanging emails securely? (Choose two.)", options: ["SCP and SFTP", "PGP and S/MIME", "PGP and HTTPS", "SFTP and S/MIME"], answer: 1, difficulty: "hard" },
+      { id: 47, mod: 2, text: "A company hires a cybersecurity consultant to perform penetration tests. The consultant is discussing with the company about the penetration testing strategy. Which statement describes the term unknown-environment testing?", options: ["This is a type of testing where the scope of the work could be extended later.", "This is a type of testing where the time frame of the work can be flexible and extension is possible.", "This type is a type of testing where the budget can be further negotiated throughout the testing.", "This type of testing is where the consultant will be provided with very limited information about the targeted systems and network."], answer: 3, difficulty: "easy" },
+      { id: 48, mod: 2, text: "A company hires a cybersecurity consultant to perform penetration tests. What is the key difference between unknown-environment testing and known-environment testing?", options: ["the types of systems and network to be tested", "the amount of information provided to the consultant", "the tools and types of tests allowed during testing", "credentials and certificates required of the consultant"], answer: 1, difficulty: "medium" }
+    ];
+
+    const LEADERBOARD_DATA = [
+      { name: "Alex R.", avatar: "AR", score: 2840, streak: 12, level: 8, color: "var(--purple-50)", textColor: "var(--purple-600)" },
+      { name: "Sara M.", avatar: "SM", score: 2510, streak: 9, level: 7, color: "var(--blue-50)", textColor: "var(--blue-800)" },
+      { name: "Omar K.", avatar: "OK", score: 2200, streak: 7, level: 6, color: "var(--teal-50)", textColor: "var(--teal-600)" },
+      { name: "Nour A.", avatar: "NA", score: 1950, streak: 5, level: 5, color: "var(--coral-50)", textColor: "var(--coral-600)" },
+      { name: "Lena T.", avatar: "LT", score: 1600, streak: 4, level: 4, color: "var(--green-50)", textColor: "var(--green-600)" },
+      { name: "You", avatar: "YO", score: 0, streak: 0, level: 1, color: "var(--amber-50)", textColor: "var(--amber-600)", isYou: true }
+    ];
+
+    let state = {
+      score: 0, streak: 0, maxStreak: 0, level: 1, xp: 0, quizCount: 0,
+      totalCorrect: 0, totalAnswered: 0, bestPct: null, badges: [],
+      questions: [], current: 0, mode: 'standard', timerInterval: null,
+      timeLeft: 0, quizScore: 0, quizCorrect: 0, answers: [], dailyBonus: false
+    };
+
+    const LEVEL_THRESHOLDS = [0, 100, 250, 500, 800, 1200, 1700, 2300, 3000, 4000];
+    const LEVEL_NAMES = ["Novice Hacker", "Script Kiddie", "Curious Hacker", "Pen Tester", "Security Analyst", "Threat Hunter", "Red Team Specialist", "Cyber Expert", "Elite Hacker", "Master of Security"];
+
+    function getLevelName(l) { return LEVEL_NAMES[Math.min(l - 1, LEVEL_NAMES.length - 1)]; }
+    function getXpForLevel(l) { return LEVEL_THRESHOLDS[Math.min(l - 1, LEVEL_THRESHOLDS.length - 1)]; }
+    function getXpForNextLevel(l) { return LEVEL_THRESHOLDS[Math.min(l, LEVEL_THRESHOLDS.length - 1)]; }
+
+    function updateNavStats() {
+      document.getElementById('nav-score').textContent = state.score;
+      document.getElementById('nav-streak').textContent = state.streak;
+      document.getElementById('nav-level').textContent = state.level;
+      document.getElementById('home-score').textContent = state.score;
+      document.getElementById('home-streak').textContent = state.maxStreak;
+      document.getElementById('home-accuracy').textContent = state.totalAnswered > 0 ? Math.round(state.totalCorrect / state.totalAnswered * 100) + '%' : '—';
+      document.getElementById('home-quizzes').textContent = state.quizCount;
+      const curXP = state.xp - getXpForLevel(state.level);
+      const nextXP = getXpForNextLevel(state.level) - getXpForLevel(state.level);
+      const pct = Math.round(Math.min(100, (curXP / nextXP) * 100));
+      document.getElementById('xp-cur').textContent = state.xp;
+      document.getElementById('xp-next').textContent = getXpForNextLevel(state.level);
+      document.getElementById('xp-bar-fill').style.width = pct + '%';
+      document.getElementById('level-name').textContent = getLevelName(state.level) + ' · Level ' + state.level;
+      document.getElementById('p-xp').textContent = state.xp;
+      document.getElementById('p-xp-next').textContent = getXpForNextLevel(state.level);
+      document.getElementById('p-xp-fill').style.width = pct + '%';
+      document.getElementById('p-total-xp').textContent = state.xp;
+      document.getElementById('p-best').textContent = state.bestPct !== null ? state.bestPct + '%' : '—';
+      document.getElementById('p-max-streak').textContent = state.maxStreak;
+      document.getElementById('p-quizzes').textContent = state.quizCount;
+      document.getElementById('profile-title').textContent = getLevelName(state.level) + ' · Level ' + state.level;
+      renderProfileBadges();
+      renderLeaderboard();
+    }
+
+    function addXP(a) {
+      state.xp += a;
+      while (state.level < 9 && state.xp >= getXpForNextLevel(state.level)) state.level++;
+    }
+
+    function showPage(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      const map = { 'home': 'page-home', 'quiz-setup': 'page-quiz-setup', 'quiz': 'page-quiz', 'results': 'page-results', 'leaderboard': 'page-leaderboard', 'profile': 'page-profile' };
+      document.getElementById(map[id] || 'page-' + id).classList.add('active');
+      document.querySelectorAll('.tab').forEach((t, i) => {
+        t.classList.toggle('active', ['home', 'quiz-setup', 'leaderboard', 'profile'][i] === id);
+      });
+      if (id === 'leaderboard') renderLeaderboard();
+      updateNavStats();
+    }
+
+    function selectMode(m) {
+      state.mode = m;
+      document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+      const el = document.getElementById('mode-' + m);
+      if (el) el.classList.add('selected');
+      const slider = document.getElementById('q-count-wrap');
+      if (m === 'all') {
+        document.getElementById('q-count').value = 48;
+        document.getElementById('q-count-out').textContent = '48';
+        document.getElementById('q-count-section').style.opacity = '0.4';
+        document.getElementById('q-count-section').style.pointerEvents = 'none';
+      } else {
+        document.getElementById('q-count').value = 10;
+        document.getElementById('q-count-out').textContent = '10';
+        document.getElementById('q-count-section').style.opacity = '1';
+        document.getElementById('q-count-section').style.pointerEvents = 'auto';
+      }
+    }
+
+    function startDailyChallenge() {
+      state.dailyBonus = true;
+      document.getElementById('q-count').value = 10;
+      document.getElementById('q-count-out').textContent = '10';
+      selectMode('timed');
+      startQuiz();
+    }
+
+    function startQuiz() {
+      let pool = state.mode === 'module1' ? ALL_QUESTIONS.filter(q => q.mod === 1) : state.mode === 'module2' ? ALL_QUESTIONS.filter(q => q.mod === 2) : state.mode === 'all' ? [...ALL_QUESTIONS] : [...ALL_QUESTIONS];
+      const count = Math.min(parseInt(document.getElementById('q-count').value) || 10, pool.length);
+      if (state.mode !== 'all') shuffle(pool);
+      const finalCount = state.mode === 'all' ? 48 : count;
+      state.questions = pool.slice(0, finalCount);
+      state.current = 0; state.quizScore = 0; state.quizCorrect = 0; state.answers = []; state.streak = 0;
+      showPage('quiz');
+      renderQuestion();
+    }
+
+    function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[a[i], a[j]] = [a[j], a[i]]; } }
+
+    function renderQuestion() {
+      const q = state.questions[state.current];
+      const total = state.questions.length;
+      document.getElementById('q-current').textContent = state.current + 1;
+      document.getElementById('q-total').textContent = total;
+      document.getElementById('q-pts').textContent = state.quizScore;
+      document.getElementById('q-progress').style.width = Math.round((state.current / total) * 100) + '%';
+      document.getElementById('streak-display').textContent = '🔥 ' + state.streak + ' streak';
+      document.getElementById('q-module-tag').textContent = 'Module ' + q.mod + ' · ' + ['', 'Ethical Hacking Basics', 'Laws & Compliance'][q.mod];
+      document.getElementById('q-text').innerHTML = q.text + `<span class="difficulty-tag diff-${q.difficulty}">${q.difficulty}</span>`;
+      const container = document.getElementById('options-container');
+      container.innerHTML = '';
+      ['A', 'B', 'C', 'D'].forEach((key, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'option-btn';
+        btn.innerHTML = `<span class="opt-key">${key}</span><span class="opt-text">${q.options[i]}</span>`;
+        btn.onclick = () => selectAnswer(i);
+        container.appendChild(btn);
+      });
+      document.getElementById('feedback-bar').className = 'feedback-bar';
+      document.getElementById('next-btn').style.display = 'none';
+      document.getElementById('question-card').className = 'question-card';
+      clearInterval(state.timerInterval);
+      if (state.mode === 'timed') {
+        state.timeLeft = q.difficulty === 'hard' ? 20 : q.difficulty === 'medium' ? 18 : 15;
+        updateTimerDisplay();
+        state.timerInterval = setInterval(() => { state.timeLeft--; updateTimerDisplay(); if (state.timeLeft <= 0) { clearInterval(state.timerInterval); timeUp(); } }, 1000);
+      } else {
+        document.getElementById('timer-val').textContent = '—';
+        document.getElementById('timer-display').className = 'timer ok';
+      }
+    }
+
+    function updateTimerDisplay() {
+      document.getElementById('timer-val').textContent = state.timeLeft + 's';
+      document.getElementById('timer-display').className = 'timer ' + (state.timeLeft <= 5 ? 'urgent' : 'ok');
+    }
+
+    function timeUp() {
+      const q = state.questions[state.current];
+      markOptions(q, -1);
+      showFeedback(false, q.options[q.answer]);
+      state.streak = 0; state.answers.push({ q, chosen: -1, correct: false }); state.totalAnswered++;
+      document.getElementById('next-btn').style.display = 'inline-flex';
+    }
+
+    function selectAnswer(idx) {
+      clearInterval(state.timerInterval);
+      const q = state.questions[state.current];
+      const correct = idx === q.answer;
+      markOptions(q, idx);
+      let pts = 0;
+      if (correct) {
+        state.streak++; if (state.streak > state.maxStreak) state.maxStreak = state.streak;
+        const base = q.difficulty === 'hard' ? 30 : q.difficulty === 'medium' ? 20 : 10;
+        const streakBonus = Math.min(state.streak, 5) * 2;
+        const timeBonus = state.mode === 'timed' && state.timeLeft > 10 ? 5 : 0;
+        pts = (base + streakBonus + timeBonus) * (state.dailyBonus ? 2 : 1);
+        state.quizScore += pts; state.score += pts; state.quizCorrect++; state.totalCorrect++;
+        addXP(Math.round(pts / 2));
+        showFeedback(true, null, pts, streakBonus);
+        document.getElementById('question-card').classList.add('correct-flash');
+        setTimeout(() => document.getElementById('question-card').classList.remove('correct-flash'), 600);
+      } else {
+        state.streak = 0;
+        showFeedback(false, q.options[q.answer]);
+        document.getElementById('question-card').classList.add('shake');
+        setTimeout(() => document.getElementById('question-card').classList.remove('shake'), 400);
+      }
+      state.totalAnswered++; state.answers.push({ q, chosen: idx, correct });
+      document.getElementById('next-btn').style.display = 'inline-flex';
+      document.getElementById('q-pts').textContent = state.quizScore;
+      document.getElementById('streak-display').textContent = '🔥 ' + state.streak + ' streak';
+      updateNavStats();
+    }
+
+    function markOptions(q, chosen) {
+      document.querySelectorAll('.option-btn').forEach((btn, i) => {
+        btn.classList.add('disabled'); btn.onclick = null;
+        if (i === chosen && chosen === q.answer) btn.classList.add('selected-correct');
+        else if (i === chosen && chosen !== q.answer) btn.classList.add('selected-wrong');
+        else if (i === q.answer) btn.classList.add('reveal-correct');
+      });
+    }
+
+    function showFeedback(correct, correctText, pts, streakBonus) {
+      const fb = document.getElementById('feedback-bar');
+      fb.classList.add('show');
+      if (correct) {
+        fb.className = 'feedback-bar show correct-fb';
+        let msg = '✓ Correct! +' + pts + ' pts';
+        if (streakBonus > 0) msg += ' (streak bonus: +' + streakBonus + ')';
+        if (state.dailyBonus) msg += ' · 2x Daily!';
+        fb.textContent = msg;
+      } else {
+        fb.className = 'feedback-bar show wrong-fb';
+        fb.textContent = '✗ Wrong. Correct answer: ' + correctText;
+      }
+    }
+
+    function nextQuestion() {
+      state.current++;
+      if (state.current >= state.questions.length) finishQuiz();
+      else renderQuestion();
+    }
+
+    function finishQuiz() {
+      clearInterval(state.timerInterval);
+      state.quizCount++;
+      const pct = Math.round(state.quizCorrect / state.questions.length * 100);
+      if (state.bestPct === null || pct > state.bestPct) state.bestPct = pct;
+      state.dailyBonus = false;
+      const earnedBadges = checkBadges(pct);
+      document.getElementById('res-pct').textContent = pct + '%';
+      document.getElementById('res-correct').textContent = state.quizCorrect;
+      document.getElementById('res-wrong').textContent = state.questions.length - state.quizCorrect;
+      document.getElementById('res-pts').textContent = state.quizScore;
+      let grade, gradeClass, msg;
+      if (pct >= 90) { grade = 'A+'; gradeClass = 'grade-A'; msg = 'Outstanding performance!'; }
+      else if (pct >= 80) { grade = 'A'; gradeClass = 'grade-A'; msg = 'Excellent work!'; }
+      else if (pct >= 70) { grade = 'B'; gradeClass = 'grade-B'; msg = 'Good job, keep it up!'; }
+      else if (pct >= 60) { grade = 'C'; gradeClass = 'grade-C'; msg = 'Decent — practice more.'; }
+      else { grade = 'D'; gradeClass = 'grade-D'; msg = 'Keep studying — you can do it!'; }
+      document.getElementById('res-grade').innerHTML = `<span class="${gradeClass}">${grade}</span>`;
+      document.getElementById('res-msg').textContent = msg;
+      document.getElementById('badges-row').innerHTML = earnedBadges.map(b => `<span class="badge-pill ${b.cls}">${b.icon} ${b.label}</span>`).join('');
+      renderReview();
+      if (pct >= 80) spawnConfetti();
+      LEADERBOARD_DATA[5].score = state.score; LEADERBOARD_DATA[5].streak = state.maxStreak; LEADERBOARD_DATA[5].level = state.level;
+      showPage('results'); updateNavStats();
+    }
+
+    function checkBadges(pct) {
+      const earned = [];
+      if (pct === 100) { earned.push({ icon: '🏆', label: 'Perfect Score', cls: 'badge-gold' }); if (!state.badges.includes('perfect')) state.badges.push('perfect'); }
+      if (pct >= 80) { earned.push({ icon: '⭐', label: 'High Achiever', cls: 'badge-blue' }); if (!state.badges.includes('highachiev')) state.badges.push('highachiev'); }
+      if (state.maxStreak >= 5) { earned.push({ icon: '🔥', label: 'On Fire (5 streak)', cls: 'badge-gold' }); if (!state.badges.includes('onfire')) state.badges.push('onfire'); }
+      if (state.quizCount === 1) { earned.push({ icon: '🎯', label: 'First Quiz', cls: 'badge-green' }); }
+      if (state.quizCount >= 5) { earned.push({ icon: '🧠', label: 'Dedicated', cls: 'badge-purple' }); if (!state.badges.includes('dedicated')) state.badges.push('dedicated'); }
+      if (state.score >= 1000) { earned.push({ icon: '💎', label: '1000 Points', cls: 'badge-gold' }); if (!state.badges.includes('1k')) state.badges.push('1k'); }
+      return earned;
+    }
+
+    function renderProfileBadges() {
+      const all = [{ id: 'perfect', icon: '🏆', label: 'Perfect Score', cls: 'badge-gold' }, { id: 'highachiev', icon: '⭐', label: 'High Achiever', cls: 'badge-blue' }, { id: 'onfire', icon: '🔥', label: 'On Fire', cls: 'badge-gold' }, { id: 'dedicated', icon: '🧠', label: 'Dedicated', cls: 'badge-purple' }, { id: '1k', icon: '💎', label: '1000 Points', cls: 'badge-gold' }];
+      const el = document.getElementById('profile-badges'); if (!el) return;
+      if (state.badges.length === 0) { el.innerHTML = '<span style="font-size:13px;color:var(--text-secondary);">No badges yet — complete quizzes to earn them!</span>'; return; }
+      el.innerHTML = all.filter(b => state.badges.includes(b.id)).map(b => `<span class="badge-pill ${b.cls}">${b.icon} ${b.label}</span>`).join('');
+    }
+
+    function renderReview() {
+      const keys = ['A', 'B', 'C', 'D'];
+      document.getElementById('review-container').innerHTML = state.answers.map((a, i) => {
+        const chosen = a.chosen >= 0 ? `${keys[a.chosen]}. ${a.q.options[a.chosen]}` : 'Timed out';
+        return `<div class="review-item ${a.correct ? 'correct-r' : 'wrong-r'}">
+      <div class="review-q">${i + 1}. ${a.q.text}</div>
+      <div class="review-ans ${a.correct ? 'ok' : 'bad'}">${a.correct ? '✓' : '✗'} Your answer: ${chosen}</div>
+      ${!a.correct ? `<div class="review-correct-ans">✓ Correct: ${keys[a.q.answer]}. ${a.q.options[a.q.answer]}</div>` : ''}
+    </div>`;
+      }).join('');
+    }
+
+    function renderLeaderboard() {
+      const el = document.getElementById('lb-container'); if (!el) return;
+      const sorted = [...LEADERBOARD_DATA].sort((a, b) => b.score - a.score);
+      const rankClasses = ['rank-1', 'rank-2', 'rank-3'];
+      el.innerHTML = sorted.map((p, i) => `<div class="lb-row ${p.isYou ? 'lb-you' : ''}">
+    <div class="lb-rank ${i < 3 ? rankClasses[i] : 'rank-other'}">${i + 1}</div>
+    <div class="lb-avatar" style="background:${p.color};color:${p.textColor};">${p.avatar}</div>
+    <div style="flex:1;"><div class="lb-name">${p.name}${p.isYou ? ' (You)' : ''}</div><div class="lb-details">Lv ${p.level} · 🔥 ${p.streak} max streak</div></div>
+    <div class="lb-score">${p.score.toLocaleString()}</div>
+  </div>`).join('');
+    }
+
+    function spawnConfetti() {
+      const container = document.getElementById('results-confetti');
+      ['#185FA5', '#0F6E56', '#854F0B', '#534AB7', '#993C1D'].forEach((color, i) => {
+        for (let j = 0; j < 4; j++) {
+          const el = document.createElement('div'); el.className = 'confetti-piece';
+          el.style.cssText = `left:${Math.random() * 100}%;top:0;background:${color};animation-delay:${Math.random() * 0.5}s;animation-duration:${0.8 + Math.random() * 0.5}s;`;
+          container.appendChild(el); setTimeout(() => el.remove(), 1500);
+        }
+      });
+    }
+
+    function confirmQuit() {
+      clearInterval(state.timerInterval);
+      if (confirm('Quit the current quiz? Progress will be lost.')) { state.streak = 0; showPage('home'); updateNavStats(); }
+    }
+
+    function resetProgress() {
+      if (confirm('Reset all progress? This cannot be undone.')) {
+        state = { score: 0, streak: 0, maxStreak: 0, level: 1, xp: 0, quizCount: 0, totalCorrect: 0, totalAnswered: 0, bestPct: null, badges: [], questions: [], current: 0, mode: 'standard', timerInterval: null, timeLeft: 0, quizScore: 0, quizCorrect: 0, answers: [], dailyBonus: false };
+        LEADERBOARD_DATA[5].score = 0; LEADERBOARD_DATA[5].streak = 0; LEADERBOARD_DATA[5].level = 1;
+        updateNavStats();
+      }
+    }
+
+    updateNavStats(); renderLeaderboard();
+
+    // ── Starfield
+    (function () {
+      const el = document.getElementById('stars');
+      for (let i = 0; i < 80; i++) {
+        const s = document.createElement('div'); s.className = 'star';
+        s.style.cssText = `left:${Math.random() * 100}%;top:${Math.random() * 100}%;--d:${2 + Math.random() * 4}s;--o:${0.15 + Math.random() * 0.55};animation-delay:${Math.random() * 6}s`;
+        el.appendChild(s);
+      }
+    })();
+  </script>
+</body>
+
+</html>
